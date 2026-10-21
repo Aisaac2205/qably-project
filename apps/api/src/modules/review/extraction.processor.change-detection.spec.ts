@@ -108,6 +108,11 @@ function matchesWhere(row: StoredChange, where: Where): boolean {
         return condition instanceof Date
           ? row.createdAt.getTime() === condition.getTime()
           : row.createdAt < (condition as { lt: Date }).lt;
+      case 'extractedAt':
+        if ((condition as { not?: unknown }).not !== null) {
+          throw new Error('the fake store only filters stamped pushes');
+        }
+        return row.extractedAt !== null;
       case 'OR':
         return (condition as Where[]).some((clause) =>
           matchesWhere(row, clause),
@@ -240,6 +245,8 @@ function harness() {
   const changes = new Map<string, StoredChange>();
   const sources = new Map<string, string>();
   const unreadable = new Set<string>();
+  /** Commits the reader cuts at the plan limit. */
+  const truncated = new Set<string>();
   const prisma = fakePrisma(changes);
   const extract = jest.fn<Promise<ExtractionOutcome>, [ExtractionInput]>();
   const tryConsume = jest.fn().mockResolvedValue(true);
@@ -249,7 +256,11 @@ function harness() {
     if (content === undefined || unreadable.has(input.ref)) {
       return Promise.resolve({ kind: 'unavailable', reason: 'fetch-failed' });
     }
-    return Promise.resolve({ kind: 'content', content, truncated: false });
+    return Promise.resolve({
+      kind: 'content',
+      content,
+      truncated: truncated.has(input.ref),
+    });
   });
 
   /** The n-th push touching the file, one minute after the one before it. */
@@ -327,6 +338,7 @@ function harness() {
     changes,
     sources,
     unreadable,
+    truncated,
     push,
     run,
     extract,
@@ -705,6 +717,96 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
 
       expect(requestedTitles(store)).toEqual([['case 7']]);
     });
+
+    it('is the latest stamped push of any branch for the first push of a new branch', async () => {
+      const store = harness();
+      quietLogs();
+      await extractedFirstPush(store, testFile(FORTY));
+      store.push('change-2', 2, testFile(FORTY, { body: changedSeventh }), {
+        branch: 'feature/new',
+      });
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([['case 7']]);
+    });
+
+    it('is the extracted branch push for the first default-branch push after it, when the default branch was unknown', async () => {
+      const store = harness();
+      quietLogs();
+      const onBranch = testFile(FORTY, { body: changedSeventh });
+      store.push('change-1', 1, onBranch, { branch: 'feature/seven' });
+      await store.run('change-1', { answer: answerTargets });
+      store.extract.mockClear();
+      const merged = testFile(FORTY, {
+        body: (title) =>
+          title === 'case 8'
+            ? "expect('case 8').toBe('merged');"
+            : changedSeventh(title),
+      });
+      store.push('change-2', 2, merged);
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([['case 8']]);
+    });
+
+    it('compares a merge with the default branch even when the branch push was extracted', async () => {
+      const store = harness();
+      quietLogs();
+      await extractedFirstPush(store, testFile(FORTY));
+      store.push('change-2', 2, testFile(FORTY, { body: changedSeventh }), {
+        branch: 'feature/seven',
+      });
+      await store.run('change-2', { answer: answerTargets });
+      store.extract.mockClear();
+      store.push('change-3', 3, testFile(FORTY, { body: changedSeventh }));
+
+      await store.run('change-3', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([['case 7']]);
+    });
+
+    it('is the latest stamped push of any branch for a push with no known branch', async () => {
+      const store = harness();
+      quietLogs();
+      await extractedFirstPush(store, testFile(FORTY));
+      store.push('change-2', 2, testFile(FORTY), { branch: 'feature/other' });
+      store.push('change-3', 3, testFile(FORTY, { body: changedSeventh }), {
+        branch: null,
+      });
+
+      await store.run('change-3', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([['case 7']]);
+    });
+
+    it.each([
+      ['was cut by the reader', 'cut'],
+      ['is too long for every plan to have read it whole', 'long'],
+    ])(
+      'is nothing when the previous commit, rebuilt from source, %s',
+      async (_label, kind) => {
+        const store = harness();
+        quietLogs();
+        const header =
+          kind === 'long'
+            ? `import { describe, expect, it } from '@jest/globals';\n// ${'x'.repeat(60_000)}`
+            : undefined;
+        const old = store.push('change-1', 1, testFile(THREE, { header }));
+        Object.assign(old, { sourceHash: 'old', extractedAt: new Date() });
+        if (kind === 'cut') store.truncated.add('sha-change-1');
+        store.push(
+          'change-2',
+          2,
+          testFile(THREE, { header, body: changedSecond }),
+        );
+
+        await store.run('change-2', { answer: answerTargets });
+
+        expect(requestedTitles(store)).toEqual([THREE]);
+      },
+    );
 
     it('is nothing when the lookup fails, and the job still extracts', async () => {
       const store = harness();

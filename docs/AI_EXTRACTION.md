@@ -676,13 +676,18 @@ After the source is read and before the daily budget and the model call, `Extrac
 
 #### What it is compared with
 
-The previous push of the **same file**: the code change of the same project and `filePath` with the greatest `(createdAt, id)` strictly before the current one. `createdAt` is written by the database, so the order does not depend on worker clocks.
+The previous push of the **same file**, chosen by `ExtractionProcessor.findBaselinePush`, among the code changes of the same project and `filePath` strictly before the current one by `(createdAt, id)`. `createdAt` is written by the database, so the order does not depend on worker clocks.
+
+1. **The previous push of the same branch**, stamped or not. The branch is `CodeChange.batch.scmEvent.branch`, carried in `JobContext.codeChangeBranch`. Ingestion records a code change for every pushed branch but enqueues extraction only for the default branch, or for every branch when the provider did not report the default one (the gate fails open). So the push right before a merge is usually a branch push that was never stamped; comparing within the branch skips it, and a merge whose file did not change can still be skipped.
+2. **When the branch has no earlier push of the file** (the first push of a new or renamed branch), **or the push has no known branch** (its SCM event is gone): the latest **stamped** push of the file on any branch.
+
+Change detection (see "Which tests of a file changed") compares with the same push.
 
 - **The previous push is stamped and has the same hash:** the job ends. It spends no daily budget, makes no model call, spends no credit and writes no proposals. It logs one line and stamps `sourceHash` and `extractedAt` on the current code change.
 - **The job's own row is already stamped with this hash:** the job was delivered again after it finished. It ends without writing anything.
 - **Anything else** (no previous push, a different hash, or a previous push without `extractedAt`): the job writes its hash, **clears its own `extractedAt`**, and runs as before. The stamp is cleared because a push that is delivered again under another prompt, model, locale or limit is about to hold a new hash. If its new extraction then failed, found nothing or hit the case cap, the old stamp would stay next to the new hash, and the next identical push would skip a version that was never extracted.
 
-The previous push alone is compared, not "the newest successful extraction", because pushes persist out of order. With A, B, A: if push 2 (B) is still running or waiting out its retry backoff when push 3 (A) arrives, the newest *stamped* row is push 1 (A), and a comparison with it would skip push 3. Push 2 then commits B, the file at `HEAD` is A, and the inbox shows B. Comparing with push 2 instead finds a row with a hash but no `extractedAt`, which is enough to stop the skip.
+Within a branch, the previous push alone is compared, not "the newest successful extraction", because pushes persist out of order. With A, B, A: if push 2 (B) is still running or waiting out its retry backoff when push 3 (A) arrives, the newest *stamped* row is push 1 (A), and a comparison with it would skip push 3. Push 2 then commits B, the file at `HEAD` is A, and the inbox shows B. Comparing with push 2 instead finds a row with a hash but no `extractedAt`, which is enough to stop the skip. The fallback to the latest stamped push gives up that protection only where there is no earlier push of the branch to protect, or no branch at all; a push without a branch is rare, since every code change comes from an SCM event and only a deleted event leaves its batch without one.
 
 #### When a push is stamped
 
@@ -734,17 +739,19 @@ Files the parser does not read keep the whole-file extraction with its 20-case c
 
 #### The baseline
 
-The baseline is the code change of the same project, file **and branch** recorded right before this one (greatest `(createdAt, id)` strictly before it, the order of `findPreviousPush`):
+The baseline comes from the push the fingerprint gate compares with (see "What it is compared with": the previous push of the same branch, or, when the branch has no earlier push or the push has no branch, the latest stamped push of any branch). Both use the one lookup, so a job reads it once:
 
 | That push | Baseline |
 |---|---|
 | Stamped, with a snapshot | The snapshot. |
-| Stamped, without a snapshot (extracted before this column existed, or through the whole-file path) | The file read again at that push's `commitSha` through the same `SourceReader` path and limit, then parsed: one extra read. If the read fails, is truncated or does not parse, there is no baseline. |
-| Not stamped (in flight, waiting out a retry, failed, incomplete) or absent | None: every declaration counts as changed, and `removed` is `null`. |
+| Stamped, without a snapshot (extracted before this column existed, or through the whole-file path) | The file read again at that push's `commitSha` through the same `SourceReader` path and limit, then parsed: one extra read. There is no baseline when the read fails, comes back truncated, does not parse, or is at least as long as the smallest plan's source limit (60,000 characters today): a file that long may have been extracted cut under a smaller limit than the current one, and the tests past that cut were never described. |
+| Not stamped (in flight, waiting out a retry, failed) or absent | None: every declaration counts as changed, and `removed` is `null`. |
 
 Any lookup error also means no baseline, with a warning; it never blocks the extraction.
 
-The branch is the deliberate difference with the fingerprint gate. Pushes to a branch other than the default one are recorded but never extracted (`IngestionProcessor` only enqueues extraction for the default branch, or when it is unknown), so the push right before a merge is usually the branch push, never stamped: comparing with it would send the whole file on every merge, the scenario this feature exists for. Comparing with the previous push of the merge's own branch compares with what the catalog last saw there. The revert rule still holds within a branch: a push in flight on the same branch leaves the next one without a baseline. A push whose batch has no SCM event, and so no known branch, compares with the previous push of any branch. The branch comes from `CodeChange.batch.scmEvent.branch` and travels in `JobContext.codeChangeBranch`.
+Comparing within the branch is what makes the merge case work. With the gate in place, the push right before a merge is usually a branch push that was never stamped: comparing with it would send the whole file on every merge, the scenario this feature exists for. A merge compares with what the catalog last saw on its own branch, even when the branch push was extracted (default branch unknown), so a change already described on the branch is described again for the default branch. The revert rule still holds within a branch: a push in flight on the same branch leaves the next one without a baseline.
+
+Code changes recorded before the fingerprint columns existed have no `extractedAt`, so the first push of each file after the deploy finds no stamped baseline and makes one full targeted pass: every declaration, in chunks, with no cap. Its snapshot is the baseline from then on.
 
 #### Mapping the answer back
 

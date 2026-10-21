@@ -2,6 +2,7 @@ import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
 import {
+  PLAN_LIMITS,
   assessCaseDocumentation,
   assessSuiteDocumentation,
 } from '@qably/types';
@@ -125,9 +126,34 @@ interface SourceFingerprint {
 
 interface PushStamp {
   id: string;
+  commitSha: string;
   sourceHash: string | null;
   extractedAt: Date | null;
+  declarationSnapshot: unknown;
 }
+
+const PUSH_STAMP_SELECT = {
+  id: true,
+  commitSha: true,
+  sourceHash: true,
+  extractedAt: true,
+  declarationSnapshot: true,
+} as const;
+
+/** What the fingerprint gate found, handed on to change detection. */
+interface PushComparison {
+  skipped: boolean;
+  own: PushStamp | null;
+  previous: PushStamp | null;
+}
+
+/**
+ * A file shorter than this fit under every plan, so no extraction of it was
+ * ever cut, whatever limit applied when it ran.
+ */
+const SMALLEST_PLAN_SOURCE_LIMIT = Math.min(
+  ...Object.values(PLAN_LIMITS).map((limits) => limits.maxSourceCharacters),
+);
 
 function unmatchedReasonFor(sourceTruncated: boolean): string {
   return sourceTruncated ? SOURCE_TRUNCATED_REASON : NO_MATCHING_CASE_REASON;
@@ -1576,12 +1602,11 @@ export class ExtractionProcessor {
     // read (another language, a syntax error, a cut source, no test it sees).
     const declared: DeclaredFile | null =
       fingerprint === null ? null : this.readDeclarations(ctx, source);
-    if (
-      fingerprint !== null &&
-      (await this.skipUnchangedSource(ctx, fingerprint, declared))
-    ) {
-      return;
-    }
+    const comparison =
+      fingerprint === null
+        ? null
+        : await this.skipUnchangedSource(ctx, fingerprint, declared);
+    if (comparison?.skipped === true) return;
 
     // For a file the parser reads, only the declarations that are new or
     // changed since the baseline push go to the model, as explicit targets.
@@ -1591,6 +1616,7 @@ export class ExtractionProcessor {
       await this.extractChangedDeclarations(ctx, {
         fingerprint,
         declared,
+        previous: comparison?.previous ?? null,
         content: source.content,
         locale,
         readAt: (ref) =>
@@ -1700,10 +1726,8 @@ export class ExtractionProcessor {
       return;
     }
 
-    await this.stampExtraction(
-      fingerprint,
-      declared === null ? null : buildDeclarationSnapshot(declared, null),
-    );
+    // A file the parser reads never gets here, so there is no snapshot to keep.
+    await this.stampExtraction(fingerprint, null);
   }
 
   /**
@@ -1747,12 +1771,14 @@ export class ExtractionProcessor {
     job: {
       fingerprint: SourceFingerprint;
       declared: DeclaredFile;
+      /** The push it is compared with, from the fingerprint gate. */
+      previous: PushStamp | null;
       content: string;
       locale: 'es' | 'en';
       readAt: (ref: string) => Promise<SourceReadResult>;
     },
   ): Promise<void> {
-    const baseline = await this.findDeclarationBaseline(ctx, job.readAt);
+    const baseline = await this.resolveBaseline(ctx, job.previous, job.readAt);
     const diff = diffDeclarations(job.declared, baseline);
     const snapshot = buildDeclarationSnapshot(job.declared, diff.removed);
     const total = job.declared.declarations.length;
@@ -1859,57 +1885,40 @@ export class ExtractionProcessor {
   }
 
   /**
-   * The declarations of the file at its baseline push: the push of the same
-   * project, file and branch recorded right before this one (by `createdAt`,
-   * then `id`, like `findPreviousPush`).
+   * The declarations of the file at the push it is compared with (see
+   * `findBaselinePush`), or null, so every declaration counts as changed:
    *
-   * The branch matters because pushes to a branch other than the default one
-   * are recorded but never extracted: comparing a merge with the branch push
-   * right before it would always find "not extracted" and send the whole
-   * file. A push without a known branch compares with the previous push of
-   * any branch.
-   *
-   * Null, so every declaration counts as changed, when that push is not
-   * stamped (in flight, failed, incomplete) or does not exist, when the job
-   * does not know when its push was recorded, or when anything fails. A
-   * stamped push without a snapshot (extracted before snapshots existed) is
-   * read again at its commit and parsed: one extra source read.
+   * - no such push, or the lookup failed;
+   * - that push is not stamped (in flight, waiting out a retry, failed);
+   * - it is stamped without a snapshot (extracted before snapshots existed, or
+   *   through the whole-file path) and its file cannot be rebuilt safely: the
+   *   file is read again at its commit and parsed, one extra read, but only
+   *   when the read is complete and no shorter than any plan limit could have
+   *   cut it. A longer file may have been extracted cut under another limit,
+   *   so the tests past that cut were never described.
    */
-  private async findDeclarationBaseline(
+  private async resolveBaseline(
     ctx: JobContext,
+    previous: PushStamp | null,
     readAt: (ref: string) => Promise<SourceReadResult>,
   ): Promise<DeclaredFile | null> {
-    const createdAt = ctx.codeChangeCreatedAt;
-    if (ctx.codeChangeId === null || createdAt === undefined) return null;
+    if (previous === null || previous.extractedAt === null) return null;
+
+    const stored = readDeclarationSnapshot(previous.declarationSnapshot);
+    if (stored !== null) return stored;
 
     try {
-      const branch = ctx.codeChangeBranch ?? null;
-      const previous = await this.prisma.codeChange.findFirst({
-        where: {
-          projectId: ctx.projectId,
-          filePath: ctx.filePath,
-          ...(branch === null ? {} : { batch: { scmEvent: { branch } } }),
-          OR: [
-            { createdAt: { lt: createdAt } },
-            { createdAt, id: { lt: ctx.codeChangeId } },
-          ],
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        select: {
-          commitSha: true,
-          extractedAt: true,
-          declarationSnapshot: true,
-        },
-      });
-      if (previous === null || previous.extractedAt === null) return null;
-
-      const stored = readDeclarationSnapshot(previous.declarationSnapshot);
-      if (stored !== null) return stored;
-
       const source = await readAt(previous.commitSha);
       if (source.kind === 'unavailable') {
         this.logger.warn(
           `Could not read ${ctx.filePath} at ${previous.commitSha} to compare its tests, extracting every one: ${source.reason}`,
+        );
+        return null;
+      }
+
+      if (source.content.length >= SMALLEST_PLAN_SOURCE_LIMIT) {
+        this.logger.log(
+          `Not comparing ${ctx.filePath} with ${previous.commitSha}: a file of ${String(source.content.length)} characters may have been extracted cut, extracting every test`,
         );
         return null;
       }
@@ -1922,7 +1931,7 @@ export class ExtractionProcessor {
       return result.kind === 'declared' ? result.file : null;
     } catch (error) {
       this.logger.warn(
-        `Could not find the baseline of ${ctx.filePath}, extracting every test: ${
+        `Could not rebuild the baseline of ${ctx.filePath}, extracting every test: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -1931,23 +1940,23 @@ export class ExtractionProcessor {
   }
 
   /**
-   * Ends a code-change job whose file is identical to what the push recorded
-   * right before it extracted, under the same prompt, model, locale and
-   * truncation.
+   * Ends a code-change job whose file is identical to what the push it is
+   * compared with (see `findBaselinePush`) extracted, under the same prompt,
+   * model, locale and truncation.
    *
-   * Only the previous push of this file counts, never "the newest extraction
-   * overall": pushes persist out of order, so a revert (A, B, A) must not be
-   * matched with the first A while B is still in flight or in its retry
-   * backoff. That push holds its hash but no `extractedAt`, which is enough to
-   * stop the skip. Comparing by `createdAt`, which the database wrote, also
-   * keeps the order off the worker clocks.
+   * Never "the newest extraction overall": pushes persist out of order, so a
+   * revert (A, B, A) must not be matched with the first A while B is still in
+   * flight or in its retry backoff. That push holds its hash but no
+   * `extractedAt`, which is enough to stop the skip. Comparing by `createdAt`,
+   * which the database wrote, also keeps the order off the worker clocks.
    *
    * A skipped push is stamped as extracted too, because its proposals are
    * exactly those of the push it matched. A job delivered again after its own
    * extraction finished finds its own stamp and ends without writing.
    *
    * The check never blocks an extraction. If the lookup or the write fails,
-   * the job carries on and pays for the call it could have skipped.
+   * the job carries on and pays for the call it could have skipped, with no
+   * push to compare its tests with.
    *
    * The declaration snapshot moves with the stamp: a skipped push records the
    * declarations it holds, with nothing removed since the identical push it
@@ -1957,7 +1966,7 @@ export class ExtractionProcessor {
     ctx: JobContext,
     fingerprint: SourceFingerprint,
     declared: DeclaredFile | null,
-  ): Promise<boolean> {
+  ): Promise<PushComparison> {
     const { codeChangeId, sourceHash } = fingerprint;
 
     try {
@@ -1971,7 +1980,7 @@ export class ExtractionProcessor {
         this.logger.log(
           `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: this push was already extracted`,
         );
-        return true;
+        return { skipped: true, own, previous };
       }
 
       if (
@@ -1992,7 +2001,7 @@ export class ExtractionProcessor {
         this.logger.log(
           `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: unchanged since the previous push`,
         );
-        return true;
+        return { skipped: true, own, previous };
       }
 
       // The stamp goes with the old hash. A push delivered again under another
@@ -2007,52 +2016,78 @@ export class ExtractionProcessor {
           declarationSnapshot: Prisma.DbNull,
         },
       });
-      return false;
+      return { skipped: false, own, previous };
     } catch (error) {
       this.logger.warn(
         `Could not compare ${ctx.filePath} with its last extraction, extracting anyway: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return false;
+      return { skipped: false, own: null, previous: null };
     }
   }
 
-  /**
-   * This push's own row and the one recorded right before it for the same file.
-   * One query: the own row sorts first, since everything else is older. When
-   * the job does not know when its push was recorded there is no telling what
-   * came before it, so only its own row is read.
-   */
+  /** This push's own row and the push it is compared with. */
   private async findPreviousPush(
     ctx: JobContext,
     codeChangeId: string,
   ): Promise<{ own: PushStamp | null; previous: PushStamp | null }> {
-    const createdAt = ctx.codeChangeCreatedAt;
-
-    const rows: PushStamp[] = await this.prisma.codeChange.findMany({
-      where: {
-        projectId: ctx.projectId,
-        filePath: ctx.filePath,
-        ...(createdAt === undefined
-          ? { id: codeChangeId }
-          : {
-              OR: [
-                { id: codeChangeId },
-                { createdAt: { lt: createdAt } },
-                { createdAt, id: { lt: codeChangeId } },
-              ],
-            }),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 2,
-      select: { id: true, sourceHash: true, extractedAt: true },
+    const own = await this.prisma.codeChange.findFirst({
+      where: { id: codeChangeId },
+      select: PUSH_STAMP_SELECT,
     });
 
-    return {
-      own: rows.find((row) => row.id === codeChangeId) ?? null,
-      previous: rows.find((row) => row.id !== codeChangeId) ?? null,
+    return { own, previous: await this.findBaselinePush(ctx, codeChangeId) };
+  }
+
+  /**
+   * The push a code change of the file is compared with, by the fingerprint
+   * gate and by change detection alike. Order is `createdAt`, then `id`,
+   * strictly before this push.
+   *
+   * 1. The previous push of the same branch, stamped or not. Pushes to a branch
+   *    other than the default one are recorded but only extracted when the
+   *    default branch is unknown, so the push right before a merge is usually
+   *    an unstamped branch push; comparing within the branch skips it. A push
+   *    of the same branch that is in flight or failed still counts, and stops
+   *    a skip, which is what keeps a revert (A, B, A) visible.
+   * 2. When the branch has no earlier push of the file (a new or renamed
+   *    branch), or the push has no known branch: the latest stamped push of
+   *    the file on any branch.
+   *
+   * None when the job does not know when its push was recorded.
+   */
+  private async findBaselinePush(
+    ctx: JobContext,
+    codeChangeId: string,
+  ): Promise<PushStamp | null> {
+    const createdAt = ctx.codeChangeCreatedAt;
+    if (createdAt === undefined) return null;
+
+    const earlier = {
+      projectId: ctx.projectId,
+      filePath: ctx.filePath,
+      OR: [
+        { createdAt: { lt: createdAt } },
+        { createdAt, id: { lt: codeChangeId } },
+      ],
     };
+    const branch = ctx.codeChangeBranch ?? null;
+
+    if (branch !== null) {
+      const sameBranch = await this.prisma.codeChange.findFirst({
+        where: { ...earlier, batch: { scmEvent: { branch } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: PUSH_STAMP_SELECT,
+      });
+      if (sameBranch !== null) return sameBranch;
+    }
+
+    return this.prisma.codeChange.findFirst({
+      where: { ...earlier, extractedAt: { not: null } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: PUSH_STAMP_SELECT,
+    });
   }
 
   /**
