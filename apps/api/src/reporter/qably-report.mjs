@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const REPORT_VERSION = '10.1.0';
+export const REPORT_VERSION = '10.1.1';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 const MAX_TESTCASES_PER_REQUEST = 10_000;

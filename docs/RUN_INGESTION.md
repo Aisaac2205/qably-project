@@ -961,7 +961,7 @@ which in turn becomes one enqueued job per `<testsuite>` in that file. `suiteNam
 the server derives and splits by it; the reporter only supplies `externalId` (built from the job,
 the run and the file path — see `docs/CI.md`; the server then re-derives a per-suite `externalId`
 from this base when the file holds more than one suite), `source`, the commit metadata already
-read from `$GITHUB_SHA` (the pull request head commit on `pull_request` events, see `docs/CI.md`) and `git log`, and, since 10.1.0, the `ci*` parameters read from the real
+read from `$GITHUB_SHA` (since 10.1.1, on `pull_request` events, the head commit from the event file at `$GITHUB_EVENT_PATH`; see `docs/CI.md`) and `git log`, and, since 10.1.0, the `ci*` parameters read from the real
 `GITHUB_*` environment (see "CI run linking") — there is no `name` parameter, the server derives each
 run's name from the suite it actually parsed. On success the reporter reads `accepted` from the `202`
 JSON response and logs it as the number of runs queued for that file, next to the file's case count —

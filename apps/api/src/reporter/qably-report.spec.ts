@@ -649,14 +649,14 @@ describe('buildFileExternalId with a job identity', () => {
 });
 
 describe('REPORT_VERSION', () => {
-  it('is 10.1.0 now that the reporter sends CI metadata', () => {
+  it('is 10.1.1 now that pull request runs report their head commit', () => {
     const result = runNodeEval(`
       const mod = await import(${JSON.stringify(REPORTER_MODULE_URL)});
       process.stdout.write(mod.REPORT_VERSION);
     `);
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe('10.1.0');
+    expect(result.stdout).toBe('10.1.1');
   });
 });
 
