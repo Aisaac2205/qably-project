@@ -60,6 +60,48 @@ export function isTransientTransactionConflict(error: unknown): boolean {
   return false;
 }
 
+const DEFAULT_ATTEMPTS = 3;
+const BASE_DELAY_MS = 25;
+
+export interface TransientRetryOptions {
+  /** Total attempts, the first one included. */
+  attempts?: number;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+}
+
+function sleepFor(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Runs `work` again when it loses a transaction conflict, up to `attempts`
+ * times in all, waiting a growing delay with jitter in between so the two
+ * contenders do not collide again in lockstep. Meant for one interactive
+ * transaction: it rolled back whole, so running the same callback again is
+ * safe, and nothing that ran before or after it is repeated. Any other error,
+ * or the last conflict, is rethrown unchanged.
+ */
+export async function retryTransientConflicts<T>(
+  work: () => Promise<T>,
+  options: TransientRetryOptions = {},
+): Promise<T> {
+  const attempts = options.attempts ?? DEFAULT_ATTEMPTS;
+  const sleep = options.sleep ?? sleepFor;
+  const random = options.random ?? Math.random;
+
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await work();
+    } catch (error) {
+      if (attempt >= attempts || !isTransientTransactionConflict(error)) {
+        throw error;
+      }
+      await sleep(BASE_DELAY_MS * 2 ** (attempt - 1) * (1 + random()));
+    }
+  }
+}
+
 /**
  * Thrown by a job that lost a transaction conflict, so BullMQ runs it again
  * (the extraction queue retries with backoff) instead of the job recording a

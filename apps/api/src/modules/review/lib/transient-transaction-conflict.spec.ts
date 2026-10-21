@@ -2,6 +2,7 @@ import { Prisma } from '../../../../generated/prisma/client';
 import {
   RetryableTransactionConflictError,
   isTransientTransactionConflict,
+  retryTransientConflicts,
 } from './transient-transaction-conflict';
 
 /**
@@ -96,6 +97,54 @@ describe('isTransientTransactionConflict', () => {
     ['null', null],
   ])('ignores %s', (_label, error) => {
     expect(isTransientTransactionConflict(error)).toBe(false);
+  });
+});
+
+describe('retryTransientConflicts', () => {
+  const noWait = () => Promise.resolve();
+
+  it('returns the result of the first attempt that succeeds', async () => {
+    const work = jest
+      .fn()
+      .mockRejectedValueOnce(new DriverAdapterError(deadlockCause()))
+      .mockResolvedValue('committed');
+
+    await expect(
+      retryTransientConflicts(work, { attempts: 3, sleep: noWait }),
+    ).resolves.toBe('committed');
+    expect(work).toHaveBeenCalledTimes(2);
+  });
+
+  it('rethrows the last conflict once the attempts run out', async () => {
+    const conflict = knownRequestError('P2034');
+    const work = jest.fn().mockRejectedValue(conflict);
+
+    await expect(
+      retryTransientConflicts(work, { attempts: 3, sleep: noWait }),
+    ).rejects.toBe(conflict);
+    expect(work).toHaveBeenCalledTimes(3);
+  });
+
+  it('never retries an error that is not a transaction conflict', async () => {
+    const work = jest.fn().mockRejectedValue(new Error('boom'));
+
+    await expect(
+      retryTransientConflicts(work, { attempts: 3, sleep: noWait }),
+    ).rejects.toThrow('boom');
+    expect(work).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits a jittered, growing delay between attempts', async () => {
+    const sleep = jest.fn().mockResolvedValue(undefined);
+    const work = jest.fn().mockRejectedValue(knownRequestError('P2034'));
+
+    await retryTransientConflicts(work, {
+      attempts: 3,
+      sleep,
+      random: () => 0.5,
+    }).catch(() => undefined);
+
+    expect(sleep.mock.calls).toEqual([[37.5], [75]]);
   });
 });
 

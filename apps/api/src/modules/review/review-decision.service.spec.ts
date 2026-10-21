@@ -1463,7 +1463,10 @@ describe('ReviewDecisionService.lastDecision', () => {
 });
 
 describe('ReviewDecisionService.approve case lock', () => {
-  const LOCK_SQL = /FROM "test_case" WHERE id = \$1 FOR UPDATE$/;
+  // FOR NO KEY UPDATE: a reclassify that updates a proposal of this case
+  // takes a foreign-key share lock on it, which FOR UPDATE would block while
+  // this approval waits for that proposal: a deadlock cycle.
+  const LOCK_SQL = /FROM "test_case" WHERE id = \$1 FOR NO KEY UPDATE$/;
 
   function lockCalls(prisma: FakePrisma): [string, string][] {
     return (prisma.$queryRawUnsafe.mock.calls as [string, string][]).filter(
@@ -1511,6 +1514,52 @@ describe('ReviewDecisionService.approve case lock', () => {
     await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
 
     expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  function deadlock(): Error {
+    return Object.assign(new Error('deadlock detected'), {
+      name: 'DriverAdapterError',
+      cause: { kind: 'postgres', code: '40P01', originalCode: '40P01' },
+    });
+  }
+
+  it('runs the approval once more when its transaction loses a deadlock', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    const run = prisma.$transaction.getMockImplementation() as (
+      callback: (tx: FakePrisma) => unknown,
+    ) => unknown;
+    prisma.$transaction
+      .mockImplementationOnce(() => Promise.reject(deadlock()))
+      .mockImplementation(run);
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after a second conflict instead of retrying forever', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    prisma.$transaction.mockImplementation(() => Promise.reject(deadlock()));
+
+    await expect(
+      build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' }),
+    ).rejects.toThrow('deadlock detected');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry an error that is not a transaction conflict', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    prisma.$transaction.mockImplementation(() =>
+      Promise.reject(new Error('boom')),
+    );
+
+    await expect(
+      build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' }),
+    ).rejects.toThrow('boom');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });
 

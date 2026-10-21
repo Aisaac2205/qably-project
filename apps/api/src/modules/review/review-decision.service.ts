@@ -19,8 +19,10 @@ import type {
 } from './review.contracts';
 import { lockTestCaseForUpdate } from './lib/lock-test-case';
 import { publishTestCaseVersion } from './lib/publish-test-case-version';
+import { retryTransientConflicts } from './lib/transient-transaction-conflict';
 
 const PENDING_STATUS = 'in_review';
+const APPROVAL_ATTEMPTS = 2;
 
 class DecisionConflict extends Error {
   constructor() {
@@ -221,7 +223,12 @@ export class ReviewDecisionService {
     let approval: ApprovalView;
 
     try {
-      approval = await this.publish(proposal.value, suiteId, input);
+      // A deadlock or serialization failure rolled the transaction back
+      // whole, so it runs once more before the reviewer sees an error.
+      approval = await retryTransientConflicts(
+        () => this.publish(proposal.value, suiteId, input),
+        { attempts: APPROVAL_ATTEMPTS },
+      );
     } catch (error) {
       if (isUniqueViolation(error)) {
         return err(

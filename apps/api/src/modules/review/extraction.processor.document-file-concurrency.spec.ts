@@ -18,7 +18,11 @@ import { RetryableTransactionConflictError } from './lib/transient-transaction-c
  */
 
 const FILE_PATH = 'src/cart.spec.ts';
-const LOCK_SQL = /FROM "test_case" WHERE id IN \(.*\) ORDER BY id FOR UPDATE/;
+// FOR NO KEY UPDATE, not FOR UPDATE: it still serializes the writers of a
+// case, but lets a proposal that references the case take its foreign-key
+// share lock, so a reclassify or a push never waits on it in a cycle.
+const LOCK_SQL =
+  /FROM "test_case" WHERE id IN \(.*\) ORDER BY id FOR NO KEY UPDATE$/;
 
 const connection = {
   provider: 'GITHUB' as const,
@@ -143,13 +147,14 @@ function build(
       truncated: false,
     }),
   } as unknown as SourceReader;
+  const extract = jest.fn().mockResolvedValue({
+    kind: 'extracted',
+    cases: extracted,
+    suite: null,
+    usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 },
+  });
   const extractor = {
-    extract: jest.fn().mockResolvedValue({
-      kind: 'extracted',
-      cases: extracted,
-      suite: null,
-      usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 },
-    }),
+    extract,
     summarizeSuite: jest.fn(),
   } as unknown as TestCaseExtractor;
 
@@ -180,12 +185,15 @@ function build(
   jest.spyOn(processor['logger'], 'warn').mockImplementation(() => undefined);
   jest.spyOn(processor['logger'], 'error').mockImplementation(() => undefined);
 
-  return { processor, entitlement, reclassifier, extractor, log };
+  return { processor, entitlement, reclassifier, extract, log };
 }
 
-function documentFileJob(attempt = { attemptsStarted: 1, attempts: 3 }) {
+function documentFileJob(
+  attempt = { attemptsStarted: 1, attempts: 3 },
+  jobTargets: { testCaseId: string; automationKey: string }[] = targets,
+) {
   return {
-    data: { kind: 'document-file', filePath: FILE_PATH, targets },
+    data: { kind: 'document-file', filePath: FILE_PATH, targets: jobTargets },
     attemptsStarted: attempt.attemptsStarted,
     opts: { attempts: attempt.attempts },
   } as never;
@@ -443,16 +451,55 @@ describe('ExtractionProcessor — documentation jobs that lose a transaction con
       .filter((data) => data.documentationOutcome === 'failed');
   }
 
-  it('throws a retryable error so the queue runs a deadlocked document-file job again', async () => {
+  it('runs only the transaction again, once, when the conflict clears on the next attempt', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.testCase.update.mockRejectedValueOnce(deadlock());
+    const prisma = createPrisma(tx);
+    const { processor, extract } = build(prisma);
+
+    await expect(processor.process(documentFileJob())).resolves.toBeUndefined();
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(prisma.commits).toBe(1);
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(failureWrites(prisma)).toEqual([]);
+  });
+
+  it('hands the job back to the queue only once every in-process attempt lost', async () => {
     const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
     tx.testCase.update.mockRejectedValue(deadlock());
     const prisma = createPrisma(tx);
-    const { processor } = build(prisma);
+    const { processor, extract } = build(prisma);
 
     await expect(processor.process(documentFileJob())).rejects.toBeInstanceOf(
       RetryableTransactionConflictError,
     );
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(prisma.commits).toBe(0);
+    expect(extract).toHaveBeenCalledTimes(1);
     expect(failureWrites(prisma)).toEqual([]);
+  });
+
+  it('does not run the extraction again or publish twice when a conflict hits after the commit', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    const prisma = createPrisma(tx);
+    // Recording the target the model never returned is the first write after
+    // the commit; it loses a deadlock once.
+    prisma.testCase.updateMany.mockRejectedValueOnce(deadlock());
+    const { processor, extract } = build(prisma);
+    const withUnmatchedTarget = [
+      ...targets,
+      { testCaseId: 'case-3', automationKey: 'Cart > empties the cart' },
+    ];
+
+    await expect(
+      processor.process(documentFileJob(undefined, withUnmatchedTarget)),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.commits).toBe(1);
+    expect(publishedCaseIds(tx)).toEqual(['case-1', 'case-2']);
+    // One run: the first call and the retry round for the unmatched target.
+    expect(extract).toHaveBeenCalledTimes(2);
   });
 
   it('retries a serialization failure the same way', async () => {

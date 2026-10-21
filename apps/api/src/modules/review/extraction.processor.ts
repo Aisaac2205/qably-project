@@ -53,6 +53,7 @@ import {
 import {
   RetryableTransactionConflictError,
   isTransientTransactionConflict,
+  retryTransientConflicts,
 } from './lib/transient-transaction-conflict';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { testCaseUniqueConstraint } from './lib/test-case-unique-constraint';
@@ -121,8 +122,10 @@ async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
 
   const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
+  // FOR NO KEY UPDATE serializes the writers of these cases but, unlike FOR
+  // UPDATE, lets a proposal referencing them take its foreign-key share lock.
   await tx.$executeRawUnsafe(
-    `SELECT id FROM "test_case" WHERE id IN (${placeholders}) ORDER BY id FOR UPDATE`,
+    `SELECT id FROM "test_case" WHERE id IN (${placeholders}) ORDER BY id FOR NO KEY UPDATE`,
     ...ids,
   );
 }
@@ -144,6 +147,13 @@ async function lockSuiteMetadata(
   if (row === undefined) return null;
 
   return { nameSource: row.nameSource, tags: row.tags ?? [] };
+}
+
+/** Rolls back a suite summary whose suite this run no longer owns. */
+class SuiteSummaryNotOwned extends Error {
+  constructor() {
+    super('suite summary is no longer queued');
+  }
 }
 
 interface SuiteSummaryLock {
@@ -562,13 +572,33 @@ export class ExtractionProcessor {
     organizationId: string,
     summary: { title: string; description: string; tags: string[] },
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx: TxClient) => {
-      const locked = await lockSuiteForSummary(tx, suiteId);
-      if (locked === null) return true;
-      if (locked.documentationQueuedAt === null) return true;
+    try {
+      return await this.writeSuiteSummary(suiteId, organizationId, summary);
+    } catch (error) {
+      // The suite is gone, or a fresher run already wrote its summary: the
+      // transaction rolled back, credit included, and there is nothing to do.
+      if (error instanceof SuiteSummaryNotOwned) return true;
+      throw error;
+    }
+  }
 
+  private writeSuiteSummary(
+    suiteId: string,
+    organizationId: string,
+    summary: { title: string; description: string; tags: string[] },
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx: TxClient) => {
+      // Lock order, shared with the document-file job: the organization row
+      // (spending the credit updates it) before the suite row. Spending first
+      // means a run that turns out not to own the suite must roll back to give
+      // the credit back.
       const spent = await this.entitlement.spendCredit(organizationId, tx);
       if (!spent) return false;
+
+      const locked = await lockSuiteForSummary(tx, suiteId);
+      if (locked === null || locked.documentationQueuedAt === null) {
+        throw new SuiteSummaryNotOwned();
+      }
 
       const mergedTags = mergeSuiteTags(locked.tags, summary.tags);
       const nameChanged = locked.nameSource !== HUMAN_NAME_SOURCE;
@@ -696,14 +726,18 @@ export class ExtractionProcessor {
       await this.runDocumentFileExtractionUnsafe(ctx);
     } catch (error) {
       if (error instanceof RetryableProviderError) throw error;
-      if (!ctx.isFinalAttempt && isTransientTransactionConflict(error)) {
+      // Only the documentation transaction raises this, after its in-process
+      // attempts all lost and before anything committed, so running the job
+      // again repeats no committed work. A conflict anywhere else, after the
+      // commit included, is recorded like any other failure.
+      if (
+        !ctx.isFinalAttempt &&
+        error instanceof RetryableTransactionConflictError
+      ) {
         this.logger.warn(
-          `Document-file extraction for ${ctx.filePath} lost a transaction conflict; the queue will retry it`,
+          `Document-file extraction for ${ctx.filePath} lost a transaction conflict on every attempt; the queue will retry it`,
         );
-        throw new RetryableTransactionConflictError(
-          `documenting ${ctx.filePath}`,
-          error,
-        );
+        throw error;
       }
       const reason = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
@@ -1074,7 +1108,7 @@ export class ExtractionProcessor {
     // Suites with a case that got a new version, reclassified after commit.
     const documentedSuiteIds = new Set<string>();
 
-    const written = await this.prisma.$transaction(async (tx: TxClient) => {
+    const write = async (tx: TxClient): Promise<boolean> => {
       documentedSuiteIds.clear();
 
       // Lock order, shared with every other writer: the organization row
@@ -1266,6 +1300,20 @@ export class ExtractionProcessor {
       await this.applySuiteMetadata(tx, suite, [...suiteIds]);
 
       return true;
+    };
+
+    // A conflict rolls this transaction back whole, so only the transaction
+    // runs again, in process: the extraction and the credit are not repeated.
+    // When every attempt loses, the job goes back to the queue, which is safe
+    // because nothing of it committed.
+    const written = await retryTransientConflicts(() =>
+      this.prisma.$transaction(write),
+    ).catch((error: unknown) => {
+      if (!isTransientTransactionConflict(error)) throw error;
+      throw new RetryableTransactionConflictError(
+        `documenting ${ctx.filePath}`,
+        error,
+      );
     });
 
     // New documentation changes what a waiting proposal duplicates or

@@ -15,7 +15,7 @@ Approving a proposal can fail because the official case it would create or updat
 
 Approval runs in one transaction (`ReviewDecisionService.publish`, `apps/api/src/modules/review/review-decision.service.ts`):
 
-1. With a target, lock its `test_case` row (`SELECT ... FOR UPDATE`, `lockTestCaseForUpdate` in `apps/api/src/modules/review/lib/lock-test-case.ts`). The lock comes before the claim and before the versions are counted, so two writers of the same case publish one after the other: version n+1 is computed by one writer at a time. A document-file job takes the same lock, after spending its credit; approval spends none, so it has no organization row to lock first.
+1. With a target, lock its `test_case` row (`SELECT ... FOR NO KEY UPDATE`, `lockTestCaseForUpdate` in `apps/api/src/modules/review/lib/lock-test-case.ts`). The lock comes before the claim and before the versions are counted, so two writers of the same case publish one after the other: version n+1 is computed by one writer at a time. A document-file job takes the same lock, after spending its credit; approval spends none, so it has no organization row to lock first. The mode is `FOR NO KEY UPDATE` rather than `FOR UPDATE` because a reclassify updates a proposal of this case and then needs a foreign-key share lock on the case: `FOR UPDATE` blocks that share lock, so the reclassify (holding the proposal) and the approval (holding the case, waiting to claim the proposal) would deadlock.
 2. Claim the proposal: `in_review` to `approved`.
 3. With no `targetTestCaseId`, create a `TestCase` with `name = proposal.title` and, when the proposal has an `automationKey`, `automationKey = proposal.automationKey`.
 4. With a target, publish a new version and rewrite the target's `name`. The flow rewrites the target's `automationKey` only when the proposal carries one; a proposal without an `automationKey` leaves the target's key untouched.
@@ -29,6 +29,8 @@ Steps 3 and 4 can break these constraints (`apps/api/prisma/schema.prisma`, mode
 | Any other unique index, for example `test_case_version_testCaseId_version_key` if a writer publishes a version without taking the case lock | varies | `publish-conflict` |
 
 When a constraint fails, the transaction rolls back, so the proposal stays `in_review`. Retrying the same approval fails the same way until the data changes.
+
+A transaction that Postgres aborts as a deadlock victim or a serialization failure is different: it rolled back whole and would succeed on a second try. `ReviewDecisionService.approve` runs it once more (`retryTransientConflicts`, `apps/api/src/modules/review/lib/transient-transaction-conflict.ts`) before the error reaches the reviewer.
 
 ## How the API tells the constraints apart
 

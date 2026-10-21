@@ -2747,7 +2747,7 @@ describe('ExtractionProcessor — document-file job', () => {
 
     const lockCall = (
       prisma.$executeRawUnsafe.mock.calls as [string, ...string[]][]
-    ).find(([sql]) => sql.includes('FOR UPDATE'));
+    ).find(([sql]) => sql.includes('FOR NO KEY UPDATE'));
     expect(lockCall).toBeDefined();
     expect(lockCall?.[0]).toContain('test_case');
     expect(lockCall?.slice(1)).toEqual(['case-1', 'case-2']);
@@ -4066,8 +4066,62 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
     expect(tags.slice(18)).toEqual(['new-1', 'new-2']);
   });
 
-  it('does not spend a credit or write anything when the suite is deleted before the row lock', async () => {
+  /** Records whether each transaction committed or rolled back. */
+  function trackTransactions(prisma: FakePrisma) {
+    const outcomes: ('committed' | 'rolled-back')[] = [];
+    prisma.$transaction.mockImplementation(
+      async (run: (tx: FakePrisma) => unknown) => {
+        try {
+          const result = await run(prisma);
+          outcomes.push('committed');
+          return result;
+        } catch (error) {
+          outcomes.push('rolled-back');
+          throw error;
+        }
+      },
+    );
+    return outcomes;
+  }
+
+  it('spends the credit, locking the organization row, before it locks the suite row', async () => {
     const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      {
+        name: 'checkout_flow',
+        nameSource: 'ingestion',
+        tags: [],
+        documentationQueuedAt: new Date(),
+      },
+    ]);
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const entitlement = fakeEntitlement(
+      jest.fn().mockResolvedValue(true),
+      spendCredit,
+    );
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      entitlement,
+    ).process(suiteMetadataJob());
+
+    const [spendOrder] = spendCredit.mock.invocationCallOrder;
+    const [lockOrder] = prisma.$queryRawUnsafe.mock.invocationCallOrder;
+    expect(spendOrder).toBeLessThan(lockOrder);
+    expect(prisma.suite.updateMany).toHaveBeenCalled();
+  });
+
+  it('keeps no credit and writes nothing when the suite is deleted before the row lock', async () => {
+    const prisma = createPrisma();
+    const transactions = trackTransactions(prisma);
     prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
     prisma.$queryRawUnsafe.mockResolvedValue([]);
     const spendCredit = jest.fn().mockResolvedValue(true);
@@ -4090,13 +4144,16 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
       ).process(suiteMetadataJob()),
     ).resolves.toBeUndefined();
 
-    expect(spendCredit).not.toHaveBeenCalled();
+    // The credit is spent first, for the lock order, and rolled back with it.
+    expect(spendCredit).toHaveBeenCalledTimes(1);
+    expect(transactions).toEqual(['rolled-back']);
     expect(prisma.suite.update).not.toHaveBeenCalled();
     expect(prisma.suite.updateMany).not.toHaveBeenCalled();
   });
 
-  it('does not spend a credit or write anything when a fresher execution already cleared documentationQueuedAt', async () => {
+  it('keeps no credit and writes nothing when a fresher execution already cleared documentationQueuedAt', async () => {
     const prisma = createPrisma();
+    const transactions = trackTransactions(prisma);
     prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
     prisma.$queryRawUnsafe.mockResolvedValue([
       {
@@ -4126,7 +4183,8 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
       ).process(suiteMetadataJob()),
     ).resolves.toBeUndefined();
 
-    expect(spendCredit).not.toHaveBeenCalled();
+    expect(spendCredit).toHaveBeenCalledTimes(1);
+    expect(transactions).toEqual(['rolled-back']);
     expect(prisma.suite.update).not.toHaveBeenCalled();
     expect(prisma.suite.updateMany).not.toHaveBeenCalled();
   });
