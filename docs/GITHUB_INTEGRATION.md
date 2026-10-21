@@ -147,7 +147,11 @@ Compiled expressions are cached per pattern, because ingestion runs this over ev
 
 Patterns are editable through `PATCH /projects/:id`. The validation is deliberately narrow: 1 to 20 entries, each 1 to 120 characters, and **every pattern must contain at least one character that is not `*`, `?` or `/`**. That last rule is what stops `**` from being declared — it would classify every changed file as a test and send an entire push to the model. A project always declares something, so an empty list is refused too; turning extraction off is what `Organization.aiEnabled` is for.
 
-The column default stays `["*.spec.ts", "*.test.ts"]`.
+A new project is created with `["*.spec.ts", "*.test.ts", "*.spec.tsx", "*.test.tsx", "*.e2e-spec.ts"]`. The first two cover plain TypeScript tests. The `.tsx` pair covers React and Vue component tests. `*.e2e-spec.ts` covers Nest end-to-end specs: a name such as `review-inbox.e2e-spec.ts` ends in `-spec.ts`, not `.spec.ts`, so it never matched the plain spec pattern and its tests were never detected. The matcher needed no change for any of this, because the dot in a pattern is literal and each pattern is compared with the whole file name.
+
+The list lives in two places that cannot import each other: the Prisma column default in `apps/api/prisma/schema.prisma`, and `DEFAULT_TEST_FILE_PATTERNS` in `packages/types`. `apps/api/src/modules/projects/default-test-file-patterns.spec.ts` fails when the schema or the latest migration drifts from the constant.
+
+The migration `20261021120000_default_test_patterns_include_tsx` only changes the column default. It does not rewrite existing rows, on purpose: a project created before it keeps the patterns it has, and its `.tsx` and e2e test files stay undetected until someone adds `*.spec.tsx`, `*.test.tsx` or `*.e2e-spec.ts` in the repository panel. A backfill would change which files reach AI extraction, and spend credits, for projects whose owners never asked for it.
 
 The editor lives inline in the repository panel (`test-file-patterns-editor.tsx`), next to the chips that already displayed the patterns, rather than behind a dialog: declaring what counts as a test is a small, reversible edit, and a modal would hide the changed-files list the user is reading it against. `validate-test-file-patterns.ts` mirrors the server rules so the wildcard-only case is explained in place instead of coming back as a 422.
 
