@@ -6,49 +6,57 @@ import SiteHeader from "../features/navigation/components/SiteHeader.astro";
 const locale = "es";
 ---
 
-<Landing locale={locale} title="Política de Privacidad — Qably" description="Política de privacidad y tratamiento de datos de telemetría y pruebas de software en Qably.">
+<Landing locale={locale} title="Política de privacidad — Qably" description="Qué datos guarda Qably, qué servicios externos reciben datos y cómo se eliminan.">
   <SiteHeader locale={locale} altHref="/en/privacy" />
 
   {/* Main Privacy Content */}
   <main id="main-content" class="max-w-4xl mx-auto px-6 pt-28 pb-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
     <header class="space-y-3 pb-8 border-b border-white/[0.08]">
-      <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Última actualización: 3 de septiembre de 2026</p>
-      <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Política de Privacidad</h1>
+      <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Última actualización: 20 de octubre de 2026</p>
+      <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Política de privacidad</h1>
       <p class="text-base text-zinc-400">
-        Cómo recopilamos, procesamos y protegemos los datos de telemetría de pruebas, código y credenciales en Qably.
+        Qué datos guarda Qably, qué servicios externos reciben datos y cómo se eliminan.
       </p>
     </header>
 
     <section class="space-y-4">
-      <h2 class="text-xl font-semibold text-white tracking-tight">1. Datos que Recopilamos</h2>
+      <h2 class="text-xl font-semibold text-white tracking-tight">1. Datos que guarda Qably</h2>
       <p class="text-sm text-zinc-400">
-        Para operar la plataforma de gestión de calidad, recopilamos únicamente los datos necesarios para el diagnóstico de pruebas y la trazabilidad:
+        Qably guarda los datos necesarios para mostrar resultados de pruebas, documentar casos y gestionar el acceso:
       </p>
       <ul class="space-y-2 text-xs text-zinc-300 list-disc pl-5">
-        <li><strong>Metadatos de Ejecución de CI</strong>: Tiempos de respuesta, estado de aserciones (<code class="text-emerald-400 font-mono">pass</code>, <code class="text-rose-400 font-mono">fail</code>, <code class="text-zinc-400 font-mono">skip</code>), duración en milisegundos, nombres de suites y stack traces de error.</li>
-        <li><strong>Información de Contexto Git</strong>: SHA del commit, nombre de rama y referencia del pull request (por ejemplo, <code class="text-white font-mono">PR #142</code>).</li>
-        <li><strong>Datos de Usuario y Organización</strong>: Nombre, correo electrónico, identificador de organización y datos de sesión autenticada.</li>
+        <li><strong>Resultados de CI</strong>: estado de cada caso (<code class="text-emerald-400 font-mono">pass</code>, <code class="text-rose-400 font-mono">fail</code>, <code class="text-zinc-400 font-mono">skip</code>), duración en milisegundos, nombres de suites y de casos, y los mensajes y detalles de error de las pruebas que fallan, como el stack trace.</li>
+        <li><strong>Contexto de Git</strong>: SHA, mensaje y autor del commit, nombre de la rama y, en los eventos de GitHub, el título, los archivos modificados y la referencia del pull request.</li>
+        <li><strong>Usuarios y organizaciones</strong>: nombre, correo electrónico, rol, organización y datos de la sesión autenticada. Las invitaciones guardan el correo invitado.</li>
+        <li><strong>Evidencia de propuestas</strong>: la ruta del archivo de pruebas y una cita breve de su código.</li>
+        <li><strong>Conversaciones con Aeris</strong>: los mensajes y las respuestas de cada hilo de chat del proyecto.</li>
       </ul>
     </section>
 
     <section class="space-y-4">
-      <h2 class="text-xl font-semibold text-white tracking-tight">2. Política Estricta de Inteligencia Artificial</h2>
+      <h2 class="text-xl font-semibold text-white tracking-tight">2. Servicios externos que intervienen</h2>
       <p class="text-sm text-zinc-400">
-        El motor de IA de Qably procesa diffs de código y casos de prueba en memoria de forma aislada. <strong>Nunca almacenamos tus archivos de código fuente en bases de entrenamiento ni los compartimos con terceros para entrenamiento de modelos de lenguaje</strong>. Las propuestas generadas son propiedad exclusiva de tu organización.
+        Estos son los servicios externos que reciben datos de Qably o los envían:
+      </p>
+      <ul class="space-y-2 text-xs text-zinc-300 list-disc pl-5">
+        <li><strong>GitHub</strong>: Qably lee desde el repositorio conectado cada archivo de pruebas que documenta, sin clonar el repositorio, y recibe los eventos de push y pull request que GitHub envía por webhook.</li>
+        <li><strong>Google Gemini (IA)</strong>: recibe el contenido del archivo de pruebas, hasta un máximo de caracteres que depende del plan. En las conversaciones con Aeris recibe además el mensaje, el historial, el contexto del proyecto y, cuando se consulta un caso, fragmentos de su archivo de pruebas.</li>
+        <li><strong>Resend (correo)</strong>: envía los correos de la cuenta, las invitaciones y las notificaciones por correo electrónico.</li>
+        <li><strong>Slack y Discord</strong>: reciben notificaciones solo en las organizaciones que configuran un webhook.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">3. Seguridad de las credenciales</h2>
+      <p class="text-sm text-zinc-400">
+        Los secretos de webhook, los tokens de acceso a repositorios y las URL de webhook de Slack y Discord se cifran con <strong>AES-256-GCM</strong> antes de guardarse. De las claves de API solo se guarda un hash <strong>SHA-256</strong>, por lo que no se pueden volver a mostrar. Las comunicaciones con la aplicación y la API usan HTTPS.
       </p>
     </section>
 
     <section class="space-y-4">
-      <h2 class="text-xl font-semibold text-white tracking-tight">3. Seguridad y Almacenamiento</h2>
+      <h2 class="text-xl font-semibold text-white tracking-tight">4. Eliminación de datos</h2>
       <p class="text-sm text-zinc-400">
-        Todos los datos se transmiten mediante protocolos seguros <strong>TLS 1.3</strong> y se almacenan en volúmenes de almacenamiento cifrados en reposo con <strong>AES-256</strong>. Las claves de API se almacenan con hash criptográfico unidireccional SHA-256.
-      </p>
-    </section>
-
-    <section class="space-y-4">
-      <h2 class="text-xl font-semibold text-white tracking-tight">4. Retención de Datos y Derecho al Olvido (GDPR / CCPA)</h2>
-      <p class="text-sm text-zinc-400">
-        Los resultados detallados de ejecuciones se conservan durante el periodo estipulado en tu plan (por defecto 90 días). Puedes solicitar la eliminación completa e irrevocable de los datos de tu organización en cualquier momento contactando a <code class="text-white">privacy@qably.com</code>.
+        Un owner o un admin puede eliminar un proyecto desde la aplicación. Esa acción elimina también sus ejecuciones, casos de prueba, evidencias, propuestas y conversaciones con Aeris. Cada conversación con Aeris también se puede eliminar por separado.
       </p>
     </section>
   </main>
