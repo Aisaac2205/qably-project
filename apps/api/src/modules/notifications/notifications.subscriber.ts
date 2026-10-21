@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   DOMAIN_EVENTS,
+  type ExtractionCappedEvent,
   type ProposalsCreatedEvent,
   type ScmEventFailedEvent,
 } from '../../common/events/domain-events';
@@ -27,6 +28,38 @@ export class NotificationsSubscriber {
     } catch (error) {
       this.logger.warn(
         `Failed to notify the ingestion failure of SCM event ${event.scmEventId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * A skipped push is a silent loss unless someone is told, so it is high
+   * severity. The key is the batch: one push reaches every project of its
+   * connection, and each project skips its own batch. Like a push's
+   * `proposals_ready`, the row carries the ingestion batch.
+   */
+  @OnEvent(DOMAIN_EVENTS.extractionCapped, { async: true })
+  async onExtractionCapped(event: ExtractionCappedEvent): Promise<void> {
+    try {
+      await this.publisher.publish({
+        eventType: 'extraction_capped',
+        organizationId: event.organizationId,
+        severity: 'high',
+        payload: {
+          count: event.fileCount,
+          limit: event.limit,
+          projectId: event.projectId,
+          batchId: event.batchId,
+        },
+        dedupeKey: `extraction_capped:${event.batchId}`,
+        projectId: event.projectId,
+        ingestionBatchId: event.batchId,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to notify the capped extraction of batch ${event.batchId}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

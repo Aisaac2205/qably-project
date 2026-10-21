@@ -101,6 +101,37 @@ A member who already read the notification does not see it become unread when th
 
 Email and webhooks are one-shot per batch. They carry the count the first processed job read, which can be lower than the final number for a push with several files. The in-app notification is the one that converges. The email template has no action link, so only webhooks link to the batch.
 
+## When a push is skipped
+
+Every file a push sends to extraction costs one AI credit and one unit of the daily budget, and a push can match any number of files. `EXTRACTION_MAX_FILES_PER_BATCH` bounds that: when the files of one project batch that matched a test pattern are more than the limit, `ExtractionService.enqueueCodeChanges` queues none of them. The batch is skipped whole, not truncated, because a partial batch would leave tests missing from the review inbox with nothing to show which.
+
+**There is no resume action yet.** Skipping is final for that push. The batch was already created as `COMPLETED`, and documenting files from the suites only reaches cases that already exist, so it cannot recover the code changes of a skipped batch. The way to get proposals for those tests today is to push fewer test files at a time. A button that re-queues a skipped batch is a follow-up.
+
+| | |
+|---|---|
+| Setting | `EXTRACTION_MAX_FILES_PER_BATCH`, a positive integer. Default `50`. Not set, or set to an empty value, means 50. `0`, a negative number or a decimal stops the API from starting. |
+| Counted | Files of one ingestion batch, which is one push for one project, that matched a test pattern. Files that matched none are not counted. |
+| Bound per push | The limit applies per project, not per push. A push to a connection with N projects can queue up to N times the limit. |
+| At the limit | Exactly the limit is allowed. Only more than the limit skips the batch. |
+| Dedupe key | `extraction_capped:<ingestionBatchId>`, so a second event for the same batch does not duplicate the notification. A repeat keeps the first write and leaves the row as it was. |
+| Event | `extraction.capped`, see [DOMAIN_EVENTS.md](./DOMAIN_EVENTS.md#extractioncapped). |
+
+Nobody loses the signal: every member who has the event on (in-app is on by default, email is off) gets one `extraction_capped` notification with severity `high`, and so does every Slack or Discord channel subscribed to it:
+
+> Proposals were not extracted from 120 test files because this push exceeds the limit of 50 test files per push. Push fewer test files at a time to extract them.
+
+The copy says "push" because that is what the reader sees; the count is for the project the notification names. The payload is `{ count, limit, projectId, batchId }`. The row stores the project and the ingestion batch, the in-app link is `/projects/<projectId>/repository`, and the Slack or Discord message links to the same page. The email template has no action link. The preference lives under Review in Settings, next to `proposals_ready`.
+
+### Raising the limit
+
+1. Set `EXTRACTION_MAX_FILES_PER_BATCH` to the new value in the API environment and restart the API. The value is read when the API starts.
+2. Check `AERIS_DAILY_BUDGET` first. The limit is the per-batch bound and the daily budget is the per-day one, so a higher limit with an unset budget lets one large push spend without limit.
+3. A push that was already skipped is not replayed. The next push is judged against the new limit.
+
+### What the log line says
+
+One warning per skipped batch: `Extraction skipped for project <projectId> batch <batchId>: <count> test files exceed the limit of <limit> per batch.` It carries ids and numbers only, never file names or commit data. If the code change rows are gone by the time the limit is checked, the batch is still skipped, the line names the organization instead, and no notification is queued. If reading the rows or publishing the event fails, the batch is skipped as well and a warning with the error message is logged: the check never throws, because a failing ingestion job would be retried into the unique index on the SCM event and project and could never queue anything either.
+
 ## Limitations
 
 - **At-most-once.** The event bus is in-process and has no outbox. If the process stops between the commit and the publish, that announcement is lost. A retried job finds the proposal already pending and creates nothing, so it does not recover it either.

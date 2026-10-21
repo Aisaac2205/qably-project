@@ -142,6 +142,8 @@ function buildExtractionService() {
     queue as never,
     encryption as never,
     testFileLocator as never,
+    { publish: jest.fn() } as never,
+    { EXTRACTION_MAX_FILES_PER_BATCH: 50 } as never,
   );
 }
 

@@ -38,7 +38,7 @@ This package keeps type consistency across the application boundary. The record 
 - `JunitIngestRecord`: Response of the JUnit ingest endpoint: queued runs, rejected suite groups, case identity collisions, and truncated field counts.
 - `DashboardOverviewRecord`, `DashboardChannelsRecord`, `DashboardSummaryRecord`, and `TraceabilityCalendarRecord`: Dashboard endpoint responses.
 - `ChatThreadRecord`, `ChatThreadDetailRecord`, and `ChatMessageRecord`: Project chat threads and messages, including attached cases and grounding.
-- `NotificationEventType`: Trigger events for notifications (`run_failed`, `run_completed`, `case_regressed`, `ingestion_failed`, `connection_security`, `proposals_ready`). `NotificationChannel` lists the delivery channels (`in_app`, `email`, `slack`, `discord`).
+- `NotificationEventType`: Trigger events for notifications (`run_failed`, `run_completed`, `case_regressed`, `ingestion_failed`, `connection_security`, `proposals_ready`, `extraction_capped`). `NotificationChannel` lists the delivery channels (`in_app`, `email`, `slack`, `discord`).
 
 ## Shared Logic
 

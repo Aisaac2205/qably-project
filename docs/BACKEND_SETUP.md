@@ -38,6 +38,7 @@ On a deployed environment the platform injects the variables directly and no `.e
 | `GEMINI_API_KEY` | no | string | Key for the Gemini provider used by extraction, suite summaries and chat. Optional at boot: without it `AiModule` binds `DisabledExtractor`, chat reports the provider as unavailable, and extraction failures are recorded on the case. See `docs/AI_EXTRACTION.md`. |
 | `GEMINI_MODEL` | no | string | Gemini model id used for extraction, suite summaries and chat. Defaults to `gemini-3.1-flash-lite` (see `src/config/env.ts` for the current value). |
 | `AERIS_DAILY_BUDGET` | no | positive integer | Maximum Gemini calls per Pacific calendar day against the platform key, counted in Redis across extraction and chat. Unset means unmetered. |
+| `EXTRACTION_MAX_FILES_PER_BATCH` | no | positive integer | Most test files one push may send to AI extraction, counted per project (a push to a connection with N projects can send up to N times this). A batch above it is skipped whole and the organization gets an `extraction_capped` notification. Defaults to `50`; an empty value also means `50`. See `docs/PROPOSAL_NOTIFICATIONS.md`. |
 | `RESEND_API_KEY` | no | string | Resend API key for transactional email: invitations, authentication emails and notification emails. Optional: when it is missing, `MailerService` logs a warning and skips the send. When supplied it must be non-empty. |
 | `RESEND_FROM_EMAIL` | no | string | Sender address, for example `Display Name <address@domain>`. Set it together with `RESEND_API_KEY`. |
 

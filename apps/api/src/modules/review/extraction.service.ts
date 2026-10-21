@@ -1,8 +1,12 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { resolveLocale, type Locale } from '@qably/i18n';
 import { assessSuiteDocumentation } from '@qably/types';
+import { InjectEnv } from '../../config/config.tokens';
+import type { Env } from '../../config/env';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
+import { DomainEvents } from '../../common/events/domain-events.service';
 import { MAX_EXTRACTED_CASES } from '../ai/extraction.contracts';
 import {
   classifyDocumentableCase,
@@ -103,12 +107,16 @@ function buildSkips(skippedIds: SkippedIds): DocumentFilesSkip[] {
 
 @Injectable()
 export class ExtractionService {
+  private readonly logger = new Logger(ExtractionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(EXTRACTION_QUEUE)
     private readonly queue: Queue<ExtractionJobData>,
     private readonly encryption: EncryptionService,
     private readonly testFileLocator: TestFileLocator,
+    private readonly events: DomainEvents,
+    @InjectEnv() private readonly env: Env,
   ) {}
 
   private async persistDocumentationQueued(
@@ -168,6 +176,17 @@ export class ExtractionService {
     };
   }
 
+  /**
+   * Every target costs one AI credit and one unit of the daily budget, and one
+   * push can match any number of files. The limit applies to the targets of one
+   * call, which are the code changes of one project batch, so a push to a
+   * connection with N projects can queue up to N times the limit.
+   *
+   * A batch above the limit is skipped whole: queuing only part of it would
+   * hide which tests are missing from the review inbox. Nothing resumes a
+   * skipped batch, so the organization is told through a domain event. Returns
+   * how many jobs were queued, which is zero for a skipped batch.
+   */
   async enqueueCodeChanges(
     codeChanges: CodeChangeCandidate[],
     organizationId: string,
@@ -177,6 +196,13 @@ export class ExtractionService {
     );
 
     if (targets.length === 0) return 0;
+
+    const limit = this.env.EXTRACTION_MAX_FILES_PER_BATCH;
+
+    if (targets.length > limit) {
+      await this.skipOversizedBatch(targets, organizationId, limit);
+      return 0;
+    }
 
     const locale = await resolveOrgDefaultLocale(this.prisma, organizationId);
 
@@ -193,6 +219,54 @@ export class ExtractionService {
     );
 
     return targets.length;
+  }
+
+  /**
+   * The caller hands over code changes only, so the project and the batch are
+   * read back from the first one: a call carries the changes of one project
+   * batch. Without that row there is nothing to address the event to, so the
+   * batch is skipped and only the log line is left.
+   *
+   * Skipping is the safe outcome, so this never throws: a failing lookup or
+   * publish would fail the ingestion job, and its retry would hit the unique
+   * index on the SCM event and project and never queue anything either.
+   */
+  private async skipOversizedBatch(
+    targets: readonly CodeChangeCandidate[],
+    organizationId: string,
+    limit: number,
+  ): Promise<void> {
+    try {
+      const origin = await this.prisma.codeChange.findFirst({
+        where: { id: targets[0].id },
+        select: { projectId: true, batchId: true },
+      });
+
+      if (origin === null) {
+        this.logger.warn(
+          `Extraction skipped for an unknown batch of organization ${organizationId}: ${targets.length} test files exceed the limit of ${limit} per batch.`,
+        );
+        return;
+      }
+
+      this.logger.warn(
+        `Extraction skipped for project ${origin.projectId} batch ${origin.batchId}: ${targets.length} test files exceed the limit of ${limit} per batch.`,
+      );
+
+      this.events.publish(DOMAIN_EVENTS.extractionCapped, {
+        organizationId,
+        projectId: origin.projectId,
+        batchId: origin.batchId,
+        fileCount: targets.length,
+        limit,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Extraction skipped for ${targets.length} test files over the limit of ${limit} per batch, but the skip could not be announced: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   async enqueueDocumentCase(

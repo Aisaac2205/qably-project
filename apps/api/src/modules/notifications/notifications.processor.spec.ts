@@ -57,6 +57,21 @@ const singleProposalEvent: NotificationJobData = {
   projectId: 'project-1',
 };
 
+const extractionCappedEvent: NotificationJobData = {
+  eventType: 'extraction_capped',
+  organizationId: 'org-1',
+  severity: 'high',
+  payload: {
+    count: 120,
+    limit: 50,
+    projectId: 'project-1',
+    batchId: 'batch-1',
+  },
+  dedupeKey: 'extraction_capped:batch-1',
+  projectId: 'project-1',
+  ingestionBatchId: 'batch-1',
+};
+
 interface FakeMember {
   userId: string;
   role: 'owner' | 'admin' | 'member';
@@ -754,7 +769,11 @@ interface UpsertArgs {
   where: {
     userId_organizationId_dedupeKey: { userId: string; dedupeKey: string };
   };
-  create: { payload: Record<string, unknown>; ingestionBatchId?: string };
+  create: {
+    payload: Record<string, unknown>;
+    ingestionBatchId?: string;
+    projectId?: string;
+  };
   update: { payload?: Record<string, unknown>; readAt?: unknown };
 }
 
@@ -994,6 +1013,90 @@ describe('NotificationsProcessor proposals_ready deep link', () => {
     await expect(
       webhookUrl({ ...singleProposalEvent, projectId: undefined }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('NotificationsProcessor extraction_capped', () => {
+  async function webhookNotification(event: NotificationJobData): Promise<{
+    url?: string;
+    title: string;
+    message: string;
+  }> {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        id: 'webhook-slack-capped',
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const slack = createWebhookChannel();
+
+    await build(prisma, createMailer(), createEncryption(), slack).process(
+      job(event),
+    );
+
+    const [, notification] = slack.send.mock.calls[0] as [
+      string,
+      { url?: string; title: string; message: string },
+    ];
+    return notification;
+  }
+
+  it('links the webhook to the project repository page, where the push can be checked', async () => {
+    const notification = await webhookNotification(extractionCappedEvent);
+
+    expect(notification.url).toBe(
+      'https://app.qably.dev/projects/project-1/repository',
+    );
+  });
+
+  it('omits the url when the event carries no project to link to', async () => {
+    const notification = await webhookNotification({
+      ...extractionCappedEvent,
+      projectId: undefined,
+    });
+
+    expect(notification.url).toBeUndefined();
+  });
+
+  it('tells the team how many files were skipped and what the limit is', async () => {
+    const notification = await webhookNotification(extractionCappedEvent);
+
+    expect(notification.title).toBe(
+      'Proposal extraction skipped: push too large',
+    );
+    expect(notification.message).toBe(
+      'Proposals were not extracted from 120 test files because this push exceeds the limit of 50 test files per push. Push fewer test files at a time to extract them.',
+    );
+  });
+
+  it('stores the project and the ingestion batch on the in-app row', async () => {
+    const prisma = createPrisma([ownerMember]);
+
+    await build(prisma, createMailer()).process(job(extractionCappedEvent));
+
+    const [call] = upsertCalls(prisma);
+    expect(call.create.projectId).toBe('project-1');
+    expect(call.create.ingestionBatchId).toBe('batch-1');
+    expect(call.create.payload).toEqual(extractionCappedEvent.payload);
+  });
+
+  it('keeps the first notification row when the same batch is announced again', async () => {
+    const prisma = createPrisma([ownerMember]);
+    const processor = build(prisma, createMailer());
+
+    await processor.process(job(extractionCappedEvent));
+    await processor.process(job(extractionCappedEvent));
+
+    const [first, second] = upsertCalls(prisma);
+    expect(first.update).toEqual({});
+    expect(second.update).toEqual({});
+    expect(first.where).toEqual(second.where);
+    expect(first.where.userId_organizationId_dedupeKey.dedupeKey).toBe(
+      'extraction_capped:batch-1',
+    );
+    expect(prisma.extractedProposal.count).not.toHaveBeenCalled();
   });
 });
 

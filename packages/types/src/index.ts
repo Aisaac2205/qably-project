@@ -22,6 +22,7 @@ export type NotificationEventType =
   | 'ingestion_failed'
   | 'connection_security'
   | 'proposals_ready'
+  | 'extraction_capped'
 export type NotificationWebhookType = 'slack' | 'discord'
 export type NotificationDeliveryStatus = 'sent' | 'failed'
 export type ConnectionSecurityAction = 'created' | 'rotated' | 'removed'
@@ -793,6 +794,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
   ingestion_failed: { in_app: true, email: false, slack: false, discord: false },
   connection_security: { in_app: true, email: true, slack: false, discord: false },
   proposals_ready: { in_app: true, email: false, slack: false, discord: false },
+  extraction_capped: { in_app: true, email: false, slack: false, discord: false },
 }
 
 export type ProposalStatus = 'in_review' | 'approved' | 'rejected' | 'changes_requested'

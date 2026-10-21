@@ -250,7 +250,8 @@
       "connection_security_removed": "Connection {{connectionName}} was removed.",
       "proposals_ready": "{{count}} proposals are ready for review.",
       "proposals_ready_one": "{{count}} proposal is ready for review.",
-      "proposals_ready_other": "{{count}} proposals are ready for review."
+      "proposals_ready_other": "{{count}} proposals are ready for review.",
+      "extraction_capped": "Proposals were not extracted from {{count}} test files because this push exceeds the limit of {{limit}} test files per push. Push fewer test files at a time to extract them."
     },
     "emailSubject": {
       "run_failed": "Run \"{{runName}}\" failed",
@@ -267,7 +268,8 @@
       "connection_security_removed": "Connection {{connectionName}} removed",
       "proposals_ready": "{{count}} proposals ready for review",
       "proposals_ready_one": "{{count}} proposal ready for review",
-      "proposals_ready_other": "{{count}} proposals ready for review"
+      "proposals_ready_other": "{{count}} proposals ready for review",
+      "extraction_capped": "Proposal extraction skipped: push too large"
     },
     "delivery": {
       "sentTo": "Sent to {{channel}}",
@@ -1368,7 +1370,7 @@
         },
         "review": {
           "title": "Review",
-          "description": "Alerts when new proposals are waiting in the review inbox."
+          "description": "Alerts when new proposals are waiting in the review inbox or a large push was not extracted."
         },
         "security": {
           "title": "Security",
@@ -1381,7 +1383,8 @@
         "case_regressed": "Case regressed",
         "ingestion_failed": "Ingestion failed",
         "connection_security": "Connection security",
-        "proposals_ready": "Proposals ready for review"
+        "proposals_ready": "Proposals ready for review",
+        "extraction_capped": "Extraction skipped for large pushes"
       }
     },
     "webhooks": {

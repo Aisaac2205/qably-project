@@ -10,7 +10,7 @@ This package handles locale negotiation across both frontend and backend boundar
 
 - **Standard Locale Negotiation:** Implements RFC 4647 and RFC 7231 language tag parsing. Quality weights (`q=0.8`) are parsed and sorted numerically to determine user preference.
 - **Strict Typing:** Guarantees that only supported locales (`'en' | 'es'`) are resolved, falling back safely to `DEFAULT_LOCALE` (`'en'`).
-- **Shared Dictionaries:** Exports standard English (`en.json`) and Spanish (`es.json`) message catalogs. Counted copy ships as `key_one` and `key_other` entries; the `t()` function in `apps/web/src/lib/i18n/store.ts` picks the suffix from the `count` parameter. The notification catalogs (`notifications.events`, `notifications.emailSubject`) cover every `NotificationEventType`, including `proposals_ready`, and carry `_one`/`_other` entries for the batch events `run_completed`, `run_failed` and `proposals_ready`.
+- **Shared Dictionaries:** Exports standard English (`en.json`) and Spanish (`es.json`) message catalogs. Counted copy ships as `key_one` and `key_other` entries; the `t()` function in `apps/web/src/lib/i18n/store.ts` picks the suffix from the `count` parameter. The notification catalogs (`notifications.events`, `notifications.emailSubject`) cover every `NotificationEventType`, including `proposals_ready` and `extraction_capped` (which interpolates `{{count}}` and `{{limit}}`), and carry `_one`/`_other` entries for the batch events `run_completed`, `run_failed` and `proposals_ready`.
 
 ## Exported Functions and Constants
 

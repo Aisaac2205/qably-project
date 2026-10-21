@@ -13,6 +13,7 @@ The extractor is Gemini through the official `@google/genai` SDK (`GoogleGenAI({
 | `GEMINI_API_KEY` | no | Activates `GeminiExtractor`. Without it, `AiModule` binds `DisabledExtractor`, which always returns `provider-unavailable` with the reason `not-configured`. No proposal is created: a job with a target case marks it `documentationOutcome: 'failed'` with that reason, and a code-change job has no target case, so it only logs. See "Failure handling" below. |
 | `GEMINI_MODEL` | no | Model id passed to `generateContent` for extraction, suite summaries and project chat. See `apps/api/src/config/env.ts` for the current default; override it to move to a different Gemini model without a code change. |
 | `AERIS_DAILY_BUDGET` | no | Maximum provider calls per Pacific calendar day against the platform key, counted across extraction and chat. Unset means unmetered. See "Credits and the daily budget" below. |
+| `EXTRACTION_MAX_FILES_PER_BATCH` | no | Most test files one push may send to extraction, counted per project: a push to a connection with N projects can queue up to N times this. `ExtractionService.enqueueCodeChanges` queues none of a batch above it, logs one warning and publishes `extraction.capped`, which becomes an `extraction_capped` notification. Nothing resumes a skipped batch yet. Defaults to `50`; an empty value also means `50`. See `docs/PROPOSAL_NOTIFICATIONS.md`. |
 
 ## How to change the model
 

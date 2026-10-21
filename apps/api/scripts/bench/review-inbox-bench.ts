@@ -113,6 +113,7 @@ function benchEnv(databaseUrl: string): Env {
     GITHUB_CLIENT_ID: 'bench-client-id',
     GITHUB_CLIENT_SECRET: 'bench-client-secret',
     GEMINI_MODEL: 'gemini-3.1-flash-lite',
+    EXTRACTION_MAX_FILES_PER_BATCH: 50,
   };
 }
 
