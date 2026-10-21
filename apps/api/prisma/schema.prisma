@@ -541,6 +541,12 @@ model ExtractedProposal {
   duplicateReasons Json?
   classifiedAt     DateTime?
 
+  /// The published version of the case this proposal was reviewed against.
+  /// Approval refuses with `stale-proposal` when the case has moved past it,
+  /// and records the version an approval superseded. Null on legacy rows,
+  /// which skip the check. A plain id, not a foreign key: it is a snapshot.
+  baseVersionId String?
+
   @@unique([codeChangeId, automationKey])
   @@index([projectId])
   @@index([projectId, status])

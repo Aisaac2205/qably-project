@@ -36,6 +36,7 @@ const decision: LastDecisionView = {
 }
 
 const publishedVersion: PublishedVersionView = {
+  id: 'version-3',
   version: 3,
   title: 'Empties the cart',
   objective: 'Confirm the cart resets',

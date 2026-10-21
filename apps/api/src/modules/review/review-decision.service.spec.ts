@@ -49,6 +49,7 @@ const proposalRow = {
     suiteId: string;
     automationFilePath: string | null;
   } | null,
+  baseVersionId: null as string | null,
 };
 
 interface FakePrisma {
@@ -1510,5 +1511,100 @@ describe('ReviewDecisionService.approve case lock', () => {
     await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
 
     expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewDecisionService.approve stale proposal', () => {
+  function caseAt(prisma: FakePrisma, currentVersionId: string | null) {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ currentVersionId }]);
+  }
+
+  it('refuses to publish over a version newer than the one the reviewer saw', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-by-aeris');
+    const publish = jest.fn();
+
+    const result = await build(prisma, fakeEvents(publish)).approve(
+      org,
+      'proposal-1',
+      { actorId: 'user-1', baseVersionId: 'version-seen' },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'stale-proposal' });
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+    expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the reviewer saw no published version and the case has one since', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-by-aeris');
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      baseVersionId: null,
+    });
+
+    expect(result).toEqual({ ok: false, error: 'stale-proposal' });
+  });
+
+  it('publishes when the case is still at the version the reviewer saw, and records it on the proposal', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-seen');
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      baseVersionId: 'version-seen',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
+      data: { status: 'approved', baseVersionId: 'version-seen' },
+    });
+  });
+
+  it('compares against the base the proposal recorded when the request sends none', async () => {
+    const prisma = createPrisma({
+      targetTestCaseId: 'case-existing',
+      baseVersionId: 'version-at-extraction',
+    });
+    caseAt(prisma, 'version-by-aeris');
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'stale-proposal' });
+  });
+
+  it('skips the check for a legacy request and proposal that carry no base', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-by-aeris');
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
+      data: { status: 'approved', baseVersionId: 'version-by-aeris' },
+    });
+  });
+
+  it('ignores the base when the approval creates a new case', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      baseVersionId: 'version-of-some-match',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
+      data: { status: 'approved' },
+    });
   });
 });

@@ -7,6 +7,7 @@ import {
   rejectProposal,
   type ApprovalResult,
   type ApproveOptions,
+  type ProposalDetail,
   type RejectionResult,
   type ReviewInboxPageResult,
   type ReviewInboxCountsResult,
@@ -53,10 +54,21 @@ interface DecisionVariables {
 
 interface ApprovalVariables extends DecisionVariables {
   applyTo?: ApproveOptions['applyTo']
+  baseVersionId?: ApproveOptions['baseVersionId']
 }
 
 interface MutationContext {
   removed: RemovedItemPosition | null
+}
+
+/**
+ * The published version the inspector compared the proposal against: its id,
+ * `null` when the case had none, `undefined` when the detail never loaded and
+ * the reviewer saw no comparison at all.
+ */
+function seenBaseVersionId(detail: ProposalDetail | undefined): string | null | undefined {
+  if (detail === undefined) return undefined
+  return detail.publishedVersion?.id ?? null
 }
 
 export function useProposalDecision({
@@ -140,8 +152,8 @@ export function useProposalDecision({
 
   const approval = useMutation({
     mutationKey: [...DECISION_MUTATION_KEY, 'approve'],
-    mutationFn: ({ proposalId, comment, applyTo }: ApprovalVariables) =>
-      approveProposal(proposalId, { comment, applyTo }),
+    mutationFn: ({ proposalId, comment, applyTo, baseVersionId }: ApprovalVariables) =>
+      approveProposal(proposalId, { comment, applyTo, baseVersionId }),
     onMutate: ({ proposalId }) => applyOptimisticRemoval(proposalId),
     onSuccess: (result, { proposalId }) => {
       callbacksRef.current.onApproved(proposalId, result)
@@ -182,7 +194,13 @@ export function useProposalDecision({
       if (inFlightRef.current.has(proposalId)) return
       inFlightRef.current.add(proposalId)
       setDecisionError(null)
-      approval.mutate({ proposalId, ...options })
+      approval.mutate({
+        proposalId,
+        baseVersionId: seenBaseVersionId(
+          queryClient.getQueryData<ProposalDetail>(reviewKeys.detail(proposalId)),
+        ),
+        ...options,
+      })
     },
     reject: (proposalId: string, comment?: string) => {
       if (inFlightRef.current.has(proposalId)) return

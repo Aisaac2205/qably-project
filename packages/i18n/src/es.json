@@ -791,6 +791,7 @@
     "decisionPublishConflict": "No se pudo publicar “{{title}}” por un conflicto con los casos oficiales. Inténtalo más tarde o rechaza la propuesta.",
     "decisionIncompleteProposal": "Esta propuesta no tiene pasos — Aeris no logró extraerlos. Rechazala, o documentá el caso a mano.",
     "decisionNoMatchedCase": "El caso con el que coincidía esta propuesta ya no existe. Apruébala como caso nuevo o recházala.",
+    "decisionStaleProposal": "No se publicó “{{title}}”: su caso recibió una versión más reciente después de que abriste esta propuesta, de Aeris o de otra persona del equipo. Compara la propuesta con la nueva versión y luego apruébala o recházala.",
     "decisionError": "No se pudo procesar esta decisión. Intenta de nuevo.",
     "decisionRateLimited": "Demasiadas decisiones en poco tiempo. Espera unos segundos e inténtalo de nuevo.",
     "noDuplicates": "Sin posibles duplicados",

@@ -83,5 +83,11 @@ export function unwrap<T>(result: Result<T, ApprovalError>): T {
         code: result.error,
         message: 'This proposal has no matching case to apply to',
       });
+    case 'stale-proposal':
+      throw new ConflictException({
+        code: result.error,
+        message:
+          'The case has a newer published version than the one this proposal was reviewed against',
+      });
   }
 }

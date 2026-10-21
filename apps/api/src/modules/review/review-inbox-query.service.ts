@@ -525,6 +525,7 @@ export class ReviewInboxQueryService {
           });
 
     return {
+      id: version.id,
       version: version.version,
       title: version.title,
       objective: version.objective,

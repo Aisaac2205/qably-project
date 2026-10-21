@@ -62,6 +62,20 @@ describe('review.api', () => {
     expect(init.body).toBe(JSON.stringify({ comment: 'Same flow', applyTo: 'new-case' }))
   })
 
+  it('sends the published version the reviewer saw', async () => {
+    await approveProposal('proposal-1', { baseVersionId: 'version-4' })
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(JSON.stringify({ baseVersionId: 'version-4' }))
+  })
+
+  it('sends a null base when the reviewer saw no published version', async () => {
+    await approveProposal('proposal-1', { baseVersionId: null })
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(JSON.stringify({ baseVersionId: null }))
+  })
+
   it('approves without a comment when none was written', async () => {
     await approveProposal('proposal-1')
 

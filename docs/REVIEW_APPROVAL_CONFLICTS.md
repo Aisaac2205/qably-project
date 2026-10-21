@@ -84,6 +84,7 @@ The test fixture `apps/api/test/support/prisma-unique-violation.ts` builds this 
 | `name-taken` | Another official case in this suite already uses that title | The case in the same suite whose `name` equals the proposal title |
 | `automation-key-taken` | Another official case in this suite already runs as that automated test | The case in the same suite whose `automationKey` equals the proposal's |
 | `publish-conflict` | Publishing collided with another change to the official cases. Try again | Always `null` |
+| `stale-proposal` | The case has a newer published version than the one this proposal was reviewed against | Not sent (see "Approving over a newer version") |
 
 - **Organization scope.** The lookup filters on `project.organizationId` of the caller, so a case from another organization is never returned. When nothing matches, `conflictingCase` is `null`.
 - **Update path.** When the proposal targets an existing case, the lookup runs in that case's suite and excludes the target itself. No reclassify is queued on this path, even for `automation-key-taken`.
@@ -148,6 +149,30 @@ The web client (`apps/web/src/features/review-inbox`) turns each conflict into a
 - **Mobile never reopens the detail.** A late failure on a narrow viewport only shows the error. It does not push history, select the proposal or move focus, so it cannot pull someone away from the list they are browsing.
 - **Unmounted page.** A failure that arrives after the page unmounted does not touch history, selection or focus.
 - **Error list cap.** At most three alerts show, newest last. Older ones collapse into one line, "And N more errors", whose **Clear** control removes only the hidden ones. Identical messages merge into one alert with "Happened N times", and dismissing it removes every occurrence. The list scrolls past a maximum height, so it cannot push the queue out of view.
+
+## Approving over a newer version (`stale-proposal`)
+
+A proposal for an existing case is reviewed against the case's published version, which the inspector shows as "Changes from published version N". The case can get a newer version while the proposal waits: a document-file job (the suite's **Document** action), another approval, or a person editing the case. Approving would then publish over a version the reviewer never compared against, and the last writer would win without anyone noticing.
+
+The approval carries the version the reviewer saw, and the API refuses when the case has moved past it:
+
+1. `GET /review/proposals/:id` returns `publishedVersion.id`.
+2. The web client sends it back as `baseVersionId` on `POST /review/proposals/:id/approve` (`useProposalDecision`, read from the cached proposal detail). It sends `null` when the inspector showed no published version, and leaves the field out when the detail never loaded.
+3. Inside the approval transaction, after locking the case row, `ReviewDecisionService.publish` compares the case's `currentVersionId` with that base. A mismatch rolls back with `409 stale-proposal`: nothing is claimed or published, and the proposal stays `in_review`.
+4. A successful approval records the version it superseded in `ExtractedProposal.baseVersionId` (migration `20261021150000_add_proposal_base_version`).
+
+| Request `baseVersionId` | Proposal `baseVersionId` | Check |
+|---|---|---|
+| A version id | any | The case must still be at that version |
+| `null` | any | The case must still have no published version |
+| left out | a version id | The case must still be at the proposal's base |
+| left out | `null` (every row created before this change) | Skipped, the legacy behaviour |
+
+The check only applies when the approval updates an existing case, the proposal's target or the matched case of `applyTo: 'matched-case'`. A new case has no version to be stale against.
+
+**Why the base comes from the request.** Proposals for existing cases are written by `ExtractedProposalWriter`, and recording the base when the proposal is created would mean changing that writer. The request variant needs no writer change and checks what matters: the version the reviewer actually compared against, including a refetch of the detail after they opened it. The column still lets a writer record the base at creation later; approval already honours it when the request sends none.
+
+**What the reviewer sees.** `aiReview.decisionStaleProposal` names the proposal and says the case got a newer version from Aeris or a teammate. Like the other approval conflicts, the proposal goes back into the queue and the inspector, and the lists refetch, so the comparison now shows the new version. Approving again sends the new base and goes through.
 
 ## Follow-ups
 

@@ -40,6 +40,8 @@ export interface MatchedCaseView {
 }
 
 export interface PublishedVersionView {
+  /** Sent back on approve as `baseVersionId`: the version the reviewer saw. */
+  id: string;
   version: number;
   title: string;
   objective: string;
@@ -156,6 +158,7 @@ export interface ApprovalConflict {
 export type ApprovalError =
   | ReviewError
   | 'invalid-apply-target'
+  | 'stale-proposal'
   | ApprovalConflict;
 
 export interface DecisionInput {
@@ -172,6 +175,12 @@ export type ApplyTo = 'matched-case' | 'new-case';
 
 export interface ApprovalInput extends DecisionInput {
   applyTo?: ApplyTo;
+  /**
+   * The published version of the case the reviewer saw, `null` when it had
+   * none. The approval is refused with `stale-proposal` when the case has
+   * moved past it. Left out, the proposal's own recorded base applies.
+   */
+  baseVersionId?: string | null;
 }
 
 export interface ApprovalView {

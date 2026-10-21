@@ -791,6 +791,7 @@
     "decisionPublishConflict": "Couldn't publish “{{title}}” because of a conflict with the official cases. Try again later, or reject the proposal.",
     "decisionIncompleteProposal": "This proposal has no steps — Aeris couldn't extract them. Reject it, or document the case by hand.",
     "decisionNoMatchedCase": "The case this proposal matched no longer exists. Approve it as a new case, or reject it.",
+    "decisionStaleProposal": "“{{title}}” wasn't published: its case got a newer version after you opened this proposal, from Aeris or a teammate. Compare the proposal with the new version, then approve or reject it.",
     "decisionError": "Couldn't process this decision. Try again.",
     "decisionRateLimited": "Too many decisions in a short time. Wait a few seconds and try again.",
     "noDuplicates": "No possible duplicates",

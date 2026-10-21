@@ -255,6 +255,7 @@ describe('ReviewProposalInspector', () => {
             suiteName: 'Checkout',
           },
           publishedVersion: {
+            id: 'version-4',
             version: 4,
             title: 'Empties the cart',
             objective: 'Confirm the cart resets',

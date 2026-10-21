@@ -372,9 +372,11 @@ describe('ReviewInboxPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'Update case Checks the cart' }))
 
+      // The loaded detail shows no published version, and the approval says so.
       expect(vi.mocked(approveProposal)).toHaveBeenCalledWith(duplicate.id, {
         comment: undefined,
         applyTo: 'matched-case',
+        baseVersionId: null,
       })
     })
 

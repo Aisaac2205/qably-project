@@ -25,6 +25,12 @@ describe('classifyDecisionError', () => {
     expect(classifyDecisionError(error)).toBe('invalid-apply-target')
   })
 
+  it('maps a stale proposal to its own code', () => {
+    const error = new ApiError(409, 'Conflict', 'stale-proposal')
+
+    expect(classifyDecisionError(error)).toBe('stale-proposal')
+  })
+
   it('falls back to error for an ApiError with an unrecognized code', () => {
     const error = new ApiError(500, 'Server error', 'something-else')
 
@@ -54,7 +60,7 @@ describe('classifyDecisionError', () => {
 })
 
 describe('isApprovalConflictCode', () => {
-  it.each(['name-taken', 'automation-key-taken', 'publish-conflict'] as const)(
+  it.each(['name-taken', 'automation-key-taken', 'publish-conflict', 'stale-proposal'] as const)(
     'recognizes %s as an approval conflict',
     (code) => {
       expect(isApprovalConflictCode(code)).toBe(true)
@@ -89,6 +95,10 @@ describe('decisionErrorKey', () => {
 
   it('maps rate-limited to its own i18n key', () => {
     expect(decisionErrorKey('rate-limited')).toBe('decisionRateLimited')
+  })
+
+  it('maps stale-proposal to its own i18n key', () => {
+    expect(decisionErrorKey('stale-proposal')).toBe('decisionStaleProposal')
   })
 
   it('maps error to the generic i18n key', () => {
@@ -133,6 +143,7 @@ describe('decision error copy', () => {
     'publish-conflict',
     'incomplete-proposal',
     'invalid-apply-target',
+    'stale-proposal',
     'rate-limited',
     'error',
   ]

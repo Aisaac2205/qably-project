@@ -114,6 +114,21 @@ describe('ReviewController error codes', () => {
     });
     expect(review.lastDecision).not.toHaveBeenCalled();
   });
+
+  it('throws a coded ConflictException when the case moved past the version the reviewer saw', async () => {
+    const review = fakeReview({ ok: false, error: 'stale-proposal' });
+
+    await expect(
+      build(review).approve(org, user, 'proposal-1', {
+        baseVersionId: 'version-4',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'stale-proposal' } });
+    expect(review.approve).toHaveBeenCalledWith(org, 'proposal-1', {
+      actorId: 'user-1',
+      baseVersionId: 'version-4',
+    });
+    expect(review.lastDecision).not.toHaveBeenCalled();
+  });
 });
 
 describe('ReviewController throttling', () => {

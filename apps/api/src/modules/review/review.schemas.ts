@@ -7,6 +7,7 @@ export const decisionSchema = z.object({
 
 export const approveSchema = decisionSchema.extend({
   applyTo: z.enum(['matched-case', 'new-case']).optional(),
+  baseVersionId: z.string().min(1).max(64).nullable().optional(),
 });
 
 export const documentFilesBodySchema = z

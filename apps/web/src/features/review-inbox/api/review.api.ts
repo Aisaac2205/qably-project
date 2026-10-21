@@ -47,6 +47,8 @@ export interface MatchedCaseView {
 }
 
 export interface PublishedVersionView {
+  /** Sent back on approve, so the server can refuse to publish over a newer version. */
+  id: string
   version: number
   title: string
   objective: string
@@ -95,6 +97,12 @@ export type ApplyTarget = 'matched-case' | 'new-case'
 export interface ApproveOptions {
   comment?: string
   applyTo?: ApplyTarget
+  /**
+   * The published version the reviewer compared against, `null` when there was
+   * none. The server answers `stale-proposal` when the case has moved past it.
+   * Left out, the server skips that check.
+   */
+  baseVersionId?: string | null
 }
 
 export interface ApprovalResult {
@@ -184,13 +192,14 @@ export function getProposal(
 
 export function approveProposal(
   id: string,
-  { comment, applyTo }: ApproveOptions = {},
+  { comment, applyTo, baseVersionId }: ApproveOptions = {},
 ): Promise<ApprovalResult> {
   return apiRequest<ApprovalResult>(`/review/proposals/${id}/approve`, {
     method: 'POST',
     body: {
       ...(comment === undefined ? {} : { comment }),
       ...(applyTo === undefined ? {} : { applyTo }),
+      ...(baseVersionId === undefined ? {} : { baseVersionId }),
     },
   })
 }

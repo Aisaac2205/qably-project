@@ -10,6 +10,7 @@ export type DecisionErrorCode =
   | 'publish-conflict'
   | 'incomplete-proposal'
   | 'invalid-apply-target'
+  | 'stale-proposal'
   | 'rate-limited'
   | 'error'
 
@@ -22,6 +23,7 @@ const DECISION_ERROR_KEYS: Record<DecisionErrorCode, string> = {
   'publish-conflict': 'decisionPublishConflict',
   'incomplete-proposal': 'decisionIncompleteProposal',
   'invalid-apply-target': 'decisionNoMatchedCase',
+  'stale-proposal': 'decisionStaleProposal',
   'rate-limited': 'decisionRateLimited',
   error: 'decisionError',
 }
@@ -30,10 +32,13 @@ const DECISION_ERROR_KEYS_WITH_CASE: Partial<Record<DecisionErrorCode, string>> 
   'automation-key-taken': 'decisionAutomationKeyTakenWithCase',
 }
 
+// The approval failures that keep the proposal pending and bring it back into
+// the inspector, so the reviewer can compare it again before deciding.
 const APPROVAL_CONFLICT_CODES: ReadonlySet<DecisionErrorCode> = new Set([
   'name-taken',
   'automation-key-taken',
   'publish-conflict',
+  'stale-proposal',
 ])
 
 export function classifyDecisionError(error: unknown): DecisionErrorCode {
@@ -48,6 +53,7 @@ export function classifyDecisionError(error: unknown): DecisionErrorCode {
       case 'publish-conflict':
       case 'incomplete-proposal':
       case 'invalid-apply-target':
+      case 'stale-proposal':
         return error.code
     }
   }

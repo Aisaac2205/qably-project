@@ -27,6 +27,22 @@ describe('approveSchema', () => {
       comment: 'Looks right',
     });
   });
+
+  it('takes the id of the published version the reviewer saw', () => {
+    expect(approveSchema.parse({ baseVersionId: 'version-4' })).toEqual({
+      baseVersionId: 'version-4',
+    });
+  });
+
+  it('takes a null base when the reviewer saw no published version', () => {
+    expect(approveSchema.parse({ baseVersionId: null })).toEqual({
+      baseVersionId: null,
+    });
+  });
+
+  it('rejects an empty base version id', () => {
+    expect(() => approveSchema.parse({ baseVersionId: '' })).toThrow();
+  });
 });
 
 describe('documentFilesBodySchema', () => {

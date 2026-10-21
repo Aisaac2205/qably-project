@@ -295,6 +295,7 @@ describe('ReviewInboxQueryService.findOne', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.publishedVersion).toEqual({
+        id: 'version-2',
         version: 2,
         title: 'Empties the cart',
         objective: 'Confirm the cart resets',
