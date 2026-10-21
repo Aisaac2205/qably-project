@@ -59,7 +59,9 @@ const FORBIDDEN_CLAIMS: readonly ForbiddenClaim[] = [
   { label: '50 ms', pattern: /50 ms/i },
   { label: '/ mes', pattern: /(?<!\/)\/ mes\b/i },
   { label: '/ month', pattern: /(?<!\/)\/ month\b/i },
-  { label: 'Gmail', pattern: /Gmail/i },
+  // The Gmail brand (the email channel is sent through a mailer, not Gmail). The
+  // owner's contact address ends in "@gmail.com", so a ".com" suffix is allowed.
+  { label: 'Gmail', pattern: /Gmail(?!\.com)/i },
   { label: 'Qably 2.0', pattern: /Qably 2\.0/i },
   { label: 'GDPR', pattern: /GDPR/i },
   { label: 'CCPA', pattern: /CCPA/i },
@@ -178,5 +180,37 @@ describe('landing claims guard: legal and security pages', () => {
 
   it.each(LEGAL_PAGE_FORBIDDEN_CLAIMS)('never contains "$label"', ({ pattern }) => {
     expect(findOffences(legalFiles, pattern)).toEqual([]);
+  });
+});
+
+/**
+ * The only contact address is the owner's own (a prototype has no company
+ * mailboxes). Never invent another one.
+ */
+const CONTACT_EMAIL = 'isaac.flores.dev@gmail.com';
+
+const CONTACT_PAGES: readonly string[] = [
+  'pages/security.astro',
+  'pages/privacy.astro',
+  'pages/en/security.astro',
+  'pages/en/privacy.astro',
+];
+
+describe('landing claims guard: contact address', () => {
+  const emailPattern = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+
+  it('uses only the owner address on the legal pages', () => {
+    const addresses = scannedFiles
+      .filter((file) => LEGAL_PAGES.includes(file.relativePath))
+      .flatMap((file) => file.text.match(emailPattern) ?? []);
+
+    expect(addresses.length).toBeGreaterThan(0);
+    expect(new Set(addresses)).toEqual(new Set([CONTACT_EMAIL]));
+  });
+
+  it.each(CONTACT_PAGES)('lists the contact address on %s', (page) => {
+    const file = scannedFiles.find((candidate) => candidate.relativePath === page);
+
+    expect(file?.text).toContain(`mailto:${CONTACT_EMAIL}`);
   });
 });
