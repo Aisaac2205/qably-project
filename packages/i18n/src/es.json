@@ -241,7 +241,10 @@
       "connection_security": "{{action}} en la conexión {{connectionName}}.",
       "connection_security_created": "Se creó la conexión {{connectionName}}.",
       "connection_security_rotated": "Se rotó el secreto del webhook de la conexión {{connectionName}}.",
-      "connection_security_removed": "Se eliminó la conexión {{connectionName}}."
+      "connection_security_removed": "Se eliminó la conexión {{connectionName}}.",
+      "proposals_ready": "Hay {{count}} propuestas listas para revisar.",
+      "proposals_ready_one": "Hay {{count}} propuesta lista para revisar.",
+      "proposals_ready_other": "Hay {{count}} propuestas listas para revisar."
     },
     "emailSubject": {
       "run_failed": "La ejecución \"{{runName}}\" falló",
@@ -255,7 +258,10 @@
       "connection_security": "{{action}} en la conexión {{connectionName}}",
       "connection_security_created": "Se creó la conexión {{connectionName}}",
       "connection_security_rotated": "Se rotó el secreto del webhook de {{connectionName}}",
-      "connection_security_removed": "Se eliminó la conexión {{connectionName}}"
+      "connection_security_removed": "Se eliminó la conexión {{connectionName}}",
+      "proposals_ready": "{{count}} propuestas listas para revisar",
+      "proposals_ready_one": "{{count}} propuesta lista para revisar",
+      "proposals_ready_other": "{{count}} propuestas listas para revisar"
     },
     "delivery": {
       "sentTo": "Se envió a {{channel}}",
@@ -1345,6 +1351,10 @@
           "title": "Ingesta",
           "description": "Alertas cuando falla el procesamiento de una ingesta del repositorio."
         },
+        "review": {
+          "title": "Revisión",
+          "description": "Alertas cuando hay propuestas nuevas esperando en la bandeja de revisión."
+        },
         "security": {
           "title": "Seguridad",
           "description": "Alertas sobre cambios en las credenciales de tus conexiones."
@@ -1355,7 +1365,8 @@
         "run_completed": "Ejecución completada",
         "case_regressed": "Caso con regresión",
         "ingestion_failed": "Ingesta fallida",
-        "connection_security": "Seguridad de la conexión"
+        "connection_security": "Seguridad de la conexión",
+        "proposals_ready": "Propuestas listas para revisar"
       }
     },
     "webhooks": {

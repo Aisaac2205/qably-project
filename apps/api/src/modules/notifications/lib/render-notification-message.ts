@@ -35,7 +35,11 @@ function resolveTemplateKey(
 
   if (typeof count !== 'number') return eventType;
 
-  if (eventType === 'run_completed' || eventType === 'run_failed') {
+  if (
+    eventType === 'run_completed' ||
+    eventType === 'run_failed' ||
+    eventType === 'proposals_ready'
+  ) {
     return `${eventType}_${count === 1 ? 'one' : 'other'}`;
   }
 

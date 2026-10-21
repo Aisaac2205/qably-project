@@ -754,6 +754,7 @@ enum NotificationEventType {
   case_regressed
   ingestion_failed
   connection_security
+  proposals_ready
 }
 
 enum NotificationChannel {

@@ -17,6 +17,16 @@ describe('updatePreferencesSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts a proposals_ready preference toggle', () => {
+    const result = updatePreferencesSchema.safeParse({
+      preferences: [
+        { eventType: 'proposals_ready', channel: 'in_app', enabled: true },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it('accepts an explicit locale alongside preferences', () => {
     const result = updatePreferencesSchema.safeParse({
       locale: 'es',

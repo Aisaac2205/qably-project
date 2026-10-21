@@ -241,7 +241,10 @@
       "connection_security": "{{action}} for connection {{connectionName}}.",
       "connection_security_created": "Connection {{connectionName}} was created.",
       "connection_security_rotated": "The webhook secret for connection {{connectionName}} was rotated.",
-      "connection_security_removed": "Connection {{connectionName}} was removed."
+      "connection_security_removed": "Connection {{connectionName}} was removed.",
+      "proposals_ready": "{{count}} proposals are ready for review.",
+      "proposals_ready_one": "{{count}} proposal is ready for review.",
+      "proposals_ready_other": "{{count}} proposals are ready for review."
     },
     "emailSubject": {
       "run_failed": "Run \"{{runName}}\" failed",
@@ -255,7 +258,10 @@
       "connection_security": "{{action}} for connection {{connectionName}}",
       "connection_security_created": "Connection {{connectionName}} created",
       "connection_security_rotated": "Webhook secret rotated for {{connectionName}}",
-      "connection_security_removed": "Connection {{connectionName}} removed"
+      "connection_security_removed": "Connection {{connectionName}} removed",
+      "proposals_ready": "{{count}} proposals ready for review",
+      "proposals_ready_one": "{{count}} proposal ready for review",
+      "proposals_ready_other": "{{count}} proposals ready for review"
     },
     "delivery": {
       "sentTo": "Sent to {{channel}}",
@@ -1345,6 +1351,10 @@
           "title": "Ingestion",
           "description": "Alerts when a repository ingestion fails to process."
         },
+        "review": {
+          "title": "Review",
+          "description": "Alerts when new proposals are waiting in the review inbox."
+        },
         "security": {
           "title": "Security",
           "description": "Alerts about changes to your connection credentials."
@@ -1355,7 +1365,8 @@
         "run_completed": "Run completed",
         "case_regressed": "Case regressed",
         "ingestion_failed": "Ingestion failed",
-        "connection_security": "Connection security"
+        "connection_security": "Connection security",
+        "proposals_ready": "Proposals ready for review"
       }
     },
     "webhooks": {
