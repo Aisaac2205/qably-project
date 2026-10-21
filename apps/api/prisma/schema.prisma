@@ -458,6 +458,11 @@ model CodeChange {
   // the previous successful one had the same fingerprint.
   sourceHash  String?
   extractedAt DateTime?
+  // The test declarations the parser read in this file version (see
+  // lib/change-detection), written with `extractedAt` and cleared with it, so
+  // the next push of the file knows which tests are new, changed or removed.
+  // Null when the file was not extracted or could not be parsed.
+  declarationSnapshot Json?
 
   @@unique([batchId, filePath])
   @@index([projectId])

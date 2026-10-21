@@ -5,6 +5,7 @@ import {
   assessCaseDocumentation,
   assessSuiteDocumentation,
 } from '@qably/types';
+import { Prisma } from '../../../generated/prisma/client';
 import { assertNever } from '../../common/assert-never';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { InjectEnv } from '../../config/config.tokens';
@@ -37,6 +38,12 @@ import {
   diagnoseNameCollision,
   summarizeUnmatchedTargets,
 } from './document-file-diagnostics';
+import {
+  buildDeclarationSnapshot,
+  readDeclaredFile,
+  type DeclarationSnapshot,
+  type DeclaredFile,
+} from './lib/change-detection';
 import { detectLanguage } from './lib/detect-language';
 import { fingerprintSource } from './lib/source-fingerprint';
 import {
@@ -116,6 +123,16 @@ interface PushStamp {
 
 function unmatchedReasonFor(sourceTruncated: boolean): string {
   return sourceTruncated ? SOURCE_TRUNCATED_REASON : NO_MATCHING_CASE_REASON;
+}
+
+/**
+ * The value written to `CodeChange.declarationSnapshot`. A nullable JSON
+ * column cannot take a bare null through Prisma: clearing it needs `DbNull`.
+ */
+function snapshotColumn(
+  snapshot: DeclarationSnapshot | null,
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return snapshot === null ? Prisma.DbNull : snapshot;
 }
 
 async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
@@ -1493,9 +1510,14 @@ export class ExtractionProcessor {
               content: source.content,
             }),
           };
+    // The tests the parser reads in this file version, recorded with the stamp
+    // so the next push can tell which ones changed. Null for a file it cannot
+    // read (another language, a syntax error, a cut source, no test it sees).
+    const declared: DeclaredFile | null =
+      fingerprint === null ? null : this.readDeclarations(ctx, source);
     if (
       fingerprint !== null &&
-      (await this.skipUnchangedSource(ctx, fingerprint))
+      (await this.skipUnchangedSource(ctx, fingerprint, declared))
     ) {
       return;
     }
@@ -1592,7 +1614,32 @@ export class ExtractionProcessor {
       return;
     }
 
-    await this.stampExtraction(fingerprint);
+    await this.stampExtraction(
+      fingerprint,
+      declared === null ? null : buildDeclarationSnapshot(declared, null),
+    );
+  }
+
+  /**
+   * Reads the test declarations of a code change's file for change detection.
+   * A file it cannot read is logged and goes through the whole-file
+   * extraction.
+   */
+  private readDeclarations(
+    ctx: JobContext,
+    source: { content: string; truncated: boolean },
+  ): DeclaredFile | null {
+    const result = readDeclaredFile({
+      filePath: ctx.filePath,
+      content: source.content,
+      truncated: source.truncated,
+    });
+    if (result.kind === 'declared') return result.file;
+
+    this.logger.debug(
+      `No declaration snapshot for ${ctx.filePath} at ${ctx.ref}: ${result.reason}`,
+    );
+    return null;
   }
 
   /**
@@ -1613,10 +1660,15 @@ export class ExtractionProcessor {
    *
    * The check never blocks an extraction. If the lookup or the write fails,
    * the job carries on and pays for the call it could have skipped.
+   *
+   * The declaration snapshot moves with the stamp: a skipped push records the
+   * declarations it holds, with nothing removed since the identical push it
+   * matched, and a cleared stamp clears its snapshot too.
    */
   private async skipUnchangedSource(
     ctx: JobContext,
     fingerprint: SourceFingerprint,
+    declared: DeclaredFile | null,
   ): Promise<boolean> {
     const { codeChangeId, sourceHash } = fingerprint;
 
@@ -1641,7 +1693,13 @@ export class ExtractionProcessor {
       ) {
         await this.prisma.codeChange.updateMany({
           where: { id: codeChangeId },
-          data: { sourceHash, extractedAt: new Date() },
+          data: {
+            sourceHash,
+            extractedAt: new Date(),
+            declarationSnapshot: snapshotColumn(
+              declared === null ? null : buildDeclarationSnapshot(declared, []),
+            ),
+          },
         });
         this.logger.log(
           `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: unchanged since the previous push`,
@@ -1655,7 +1713,11 @@ export class ExtractionProcessor {
       // the next identical push would skip a version never extracted.
       await this.prisma.codeChange.updateMany({
         where: { id: codeChangeId },
-        data: { sourceHash, extractedAt: null },
+        data: {
+          sourceHash,
+          extractedAt: null,
+          declarationSnapshot: Prisma.DbNull,
+        },
       });
       return false;
     } catch (error) {
@@ -1716,17 +1778,22 @@ export class ExtractionProcessor {
 
   /**
    * Marks the file version as extracted, once its proposals are saved. Written
-   * with the hash so a row never carries one without the other. The proposals
+   * with the hash and the declaration snapshot so a row never carries one
+   * without the others; a null snapshot clears any older one. The proposals
    * are already committed, so a failure here only costs the next identical push
    * one repeated extraction and must not fail, and so retry, the job.
    */
-  private async stampExtraction(fingerprint: SourceFingerprint): Promise<void> {
+  private async stampExtraction(
+    fingerprint: SourceFingerprint,
+    snapshot: DeclarationSnapshot | null,
+  ): Promise<void> {
     try {
       await this.prisma.codeChange.updateMany({
         where: { id: fingerprint.codeChangeId },
         data: {
           sourceHash: fingerprint.sourceHash,
           extractedAt: new Date(),
+          declarationSnapshot: snapshotColumn(snapshot),
         },
       });
     } catch (error) {

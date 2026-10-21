@@ -692,6 +692,25 @@ Design choices:
 
 Two jobs for the same new file can run at the same time. Neither sees a stamped previous push, so both extract; the per-file lock above keeps their proposals from doubling.
 
+### Which tests of a file changed
+
+The fingerprint above only answers "did any byte of the file change". A push that edits one test of a 40-test file still changes the file, so the question that matters is which tests changed. That is decided on the code, by the deterministic parser of [Test declarations](TEST_DECLARATIONS.md), never by comparing what the model wrote.
+
+#### The declaration snapshot
+
+`CodeChange.declarationSnapshot` (nullable JSONB, migration `20261021140000_add_code_change_declaration_snapshot`, no backfill) records the test declarations the parser read in the file version of that push (`apps/api/src/modules/review/lib/change-detection/`):
+
+| Field | Content |
+|---|---|
+| `version` | `1`. A snapshot of another version reads as missing. |
+| `fileContextHash` | The parser's per-file context hash. |
+| `declarations` | One entry per declaration, in source order: `id`, `title`, `describePath`, `bodyHash`, `contextHash`, `startLine`, `endLine`, `parametrized`. |
+| `removed` | `id`, `title` and `describePath` of the declarations the file's baseline had and this version no longer has. `null` when the job compared the file with nothing; `[]` when it compared and nothing was removed. |
+
+The `id` is local to the file: the describe path, the title (the raw source text of a title computed at runtime) and the position among the declarations that share that path and title, in source order. Line numbers are not part of it, so a test that only moved keeps its id and both of its hashes.
+
+It is written and cleared together with `extractedAt`, under the same rules: when an extraction is stamped, when a push is skipped as identical to the previous one (with `removed: []`, since nothing differs from the push it matched), and cleared when a push is about to be extracted again under a new fingerprint. A file the parser cannot read gets no snapshot: another language, a syntax error, a source cut at the plan limit (declarations past the cut would read as removed), or a file where the parser sees no test at all (a test function bound to another name, `const myTest = base.extend(...)`, is only visible to the model). Reading a stored value never fails: anything that is not a snapshot of the current version reads as missing.
+
 ### Deduplication within a batch
 
 A single extraction can return multiple cases sharing the same `automationKey` (a model quirk, or two declarations that stringify to the same reporter name). `ExtractionProcessor` deduplicates by `automationKey` before persisting, keeping only the first occurrence.
