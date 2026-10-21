@@ -31,10 +31,21 @@ interface PendingEvent {
   organizationId: string;
   provider: RepoConnectionProvider;
   repo: string;
+  branch: string;
+  /** Null when the provider did not say, and on events stored before the column. */
+  defaultBranch: string | null;
   commitSha: string;
   changedFiles: string[];
   commits: CommitWithAttributedFiles[];
   connection: { projects: Array<{ id: string; testFilePatterns: string[] }> };
+}
+
+// The official test catalog follows the repository's default branch, so only a
+// push to it seeds proposals. An unknown default branch (a provider that does
+// not report it, an event stored before the column) fails open: that may
+// duplicate proposals, which is preferable to silently stopping a catalog.
+function extractsFromBranch({ branch, defaultBranch }: PendingEvent): boolean {
+  return defaultBranch === null || branch === defaultBranch;
 }
 
 @OnDemandProcessor(INGESTION_QUEUE)
@@ -107,6 +118,8 @@ export class IngestionProcessor {
         organizationId: true,
         provider: true,
         repo: true,
+        branch: true,
+        defaultBranch: true,
         commitSha: true,
         changedFiles: true,
         commits: {
@@ -129,6 +142,16 @@ export class IngestionProcessor {
     // covers providers that report no commits, truncated pushes, an unverified
     // push order and events stored before commits carried attributed files.
     const lastCommitByFile = lastCommitPerFile(event.commits);
+
+    // Every branch is recorded: other features read the batches and code
+    // changes. Only the AI extraction is gated.
+    const extracts = extractsFromBranch(event);
+
+    if (!extracts) {
+      this.logger.log(
+        `Skipped extraction for SCM event ${event.id} (organization ${event.organizationId}): pushed ref "${event.branch}" is not the default branch "${event.defaultBranch}" (changed files: ${event.changedFiles.length})`,
+      );
+    }
 
     for (const project of event.connection.projects) {
       const batch = await this.prisma.ingestionBatch.create({
@@ -173,10 +196,12 @@ export class IngestionProcessor {
         },
       });
 
-      await this.extraction.enqueueCodeChanges(
-        batch.codeChanges,
-        event.organizationId,
-      );
+      if (extracts) {
+        await this.extraction.enqueueCodeChanges(
+          batch.codeChanges,
+          event.organizationId,
+        );
+      }
     }
   }
 }

@@ -342,6 +342,10 @@ model ScmEvent {
   kind             ScmEventKind
   repo             String
   branch           String
+  // The repository's default branch when the event was delivered. Null when the
+  // provider did not say (Bitbucket, a payload without the field) and on rows
+  // stored before the column existed; the processor treats null as "unknown".
+  defaultBranch    String?
   commitSha        String
   author           String
   title            String

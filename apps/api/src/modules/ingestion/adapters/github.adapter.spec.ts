@@ -17,6 +17,7 @@ const pushPayload = {
   repository: {
     full_name: 'acme/shop',
     html_url: 'https://github.com/acme/shop',
+    default_branch: 'main',
   },
   pusher: { name: 'ada' },
   head_commit: {
@@ -79,6 +80,7 @@ describe('GithubAdapter.normalize', () => {
       kind: 'push',
       repo: 'acme/shop',
       branch: 'main',
+      defaultBranch: 'main',
       commitSha: 'a'.repeat(40),
       author: 'ada',
       title: 'Add checkout guard',
@@ -113,6 +115,7 @@ describe('GithubAdapter.normalize', () => {
       kind: 'pull_request',
       repo: 'acme/shop',
       branch: 'feat/checkout',
+      defaultBranch: null,
       commitSha: 'b'.repeat(40),
       author: 'ada',
       title: 'Guard the checkout',
@@ -154,6 +157,113 @@ describe('GithubAdapter.normalize', () => {
         { 'x-github-event': 'push', 'x-github-delivery': 'd' },
       ),
     ).toBeNull();
+  });
+});
+
+describe('GithubAdapter.normalize default branch', () => {
+  const pushHeader = {
+    'x-github-event': 'push',
+    'x-github-delivery': 'delivery-default-branch',
+  };
+
+  function pushWith(repository: Record<string, unknown>) {
+    return build().normalize(
+      { ...pushPayload, repository: { full_name: 'acme/shop', ...repository } },
+      pushHeader,
+    );
+  }
+
+  it('reads the repository default branch from a push on any branch', () => {
+    const event = build().normalize(
+      { ...pushPayload, ref: 'refs/heads/feat/cart' },
+      pushHeader,
+    );
+
+    expect(event?.branch).toBe('feat/cart');
+    expect(event?.defaultBranch).toBe('main');
+  });
+
+  it('trims the default branch', () => {
+    expect(pushWith({ default_branch: '  develop \n' })?.defaultBranch).toBe(
+      'develop',
+    );
+  });
+
+  it('trims the pushed branch too, so the two names compare on equal terms', () => {
+    const event = build().normalize(
+      { ...pushPayload, ref: 'refs/heads/develop \n' },
+      pushHeader,
+    );
+
+    expect(event?.branch).toBe('develop');
+  });
+
+  it('trims the head branch of a pull request', () => {
+    const event = build().normalize(
+      {
+        action: 'opened',
+        repository: { full_name: 'acme/shop' },
+        pull_request: {
+          head: { ref: ' feat/cart ', sha: 'b'.repeat(40) },
+          title: 'Guard the cart',
+          html_url: 'https://github.com/acme/shop/pull/7',
+          user: { login: 'ada' },
+        },
+      },
+      { 'x-github-event': 'pull_request', 'x-github-delivery': 'delivery-pr' },
+    );
+
+    expect(event?.branch).toBe('feat/cart');
+  });
+
+  it.each([
+    ['missing', {}],
+    ['empty', { default_branch: '' }],
+    ['blank', { default_branch: '   ' }],
+    ['not a string', { default_branch: 7 }],
+    ['null', { default_branch: null }],
+  ])('has no default branch when the field is %s', (_label, repository) => {
+    expect(pushWith(repository)?.defaultBranch).toBeNull();
+  });
+
+  it('reads the default branch of the repository a pull request targets', () => {
+    const event = build().normalize(
+      {
+        action: 'synchronize',
+        repository: { full_name: 'acme/shop', default_branch: 'main' },
+        pull_request: {
+          head: {
+            ref: 'feat/cart',
+            sha: 'b'.repeat(40),
+            repo: { full_name: 'ada/shop', default_branch: 'trunk' },
+          },
+          title: 'Guard the cart',
+          html_url: 'https://github.com/acme/shop/pull/7',
+          user: { login: 'ada' },
+        },
+      },
+      { 'x-github-event': 'pull_request', 'x-github-delivery': 'delivery-pr' },
+    );
+
+    expect(event?.defaultBranch).toBe('main');
+  });
+
+  it('has no default branch for a pull request payload that omits it', () => {
+    const event = build().normalize(
+      {
+        action: 'opened',
+        repository: { full_name: 'acme/shop' },
+        pull_request: {
+          head: { ref: 'feat/cart', sha: 'b'.repeat(40) },
+          title: 'Guard the cart',
+          html_url: 'https://github.com/acme/shop/pull/7',
+          user: { login: 'ada' },
+        },
+      },
+      { 'x-github-event': 'pull_request', 'x-github-delivery': 'delivery-pr' },
+    );
+
+    expect(event?.defaultBranch).toBeNull();
   });
 });
 

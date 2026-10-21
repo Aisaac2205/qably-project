@@ -37,7 +37,7 @@ interface PushPayload {
   before?: unknown;
   after?: unknown;
   forced?: unknown;
-  repository?: { full_name?: string };
+  repository?: { full_name?: string; default_branch?: unknown };
   pusher?: { name?: string };
   head_commit?:
     | (FileChanges & {
@@ -72,7 +72,9 @@ interface PullRequestPayload {
     html_url?: string;
     user?: { login?: string };
   };
-  repository?: { full_name?: string };
+  // For a pull request this is the repository the pull request targets, not the
+  // fork the head branch lives in.
+  repository?: { full_name?: string; default_branch?: unknown };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -83,6 +85,11 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function readText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+// The trimmed name, or null when the field is missing, blank or not a string.
+function readBranchName(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
 }
 
 function readSha(value: unknown): string | null {
@@ -348,7 +355,8 @@ export class GithubAdapter implements ScmPayloadAdapter {
       provider: this.provider,
       kind: 'push',
       repo,
-      branch: (payload.ref ?? '').replace(BRANCH_PREFIX, ''),
+      branch: (payload.ref ?? '').replace(BRANCH_PREFIX, '').trim(),
+      defaultBranch: readBranchName(payload.repository?.default_branch),
       commitSha: commit.id,
       author: payload.pusher?.name ?? 'unknown',
       title: commit.message ?? '',
@@ -383,7 +391,8 @@ export class GithubAdapter implements ScmPayloadAdapter {
       provider: this.provider,
       kind: 'pull_request',
       repo,
-      branch: pull.head.ref ?? '',
+      branch: (pull.head.ref ?? '').trim(),
+      defaultBranch: readBranchName(payload.repository?.default_branch),
       commitSha: pull.head.sha,
       author: pull.user?.login ?? 'unknown',
       title: pull.title ?? '',

@@ -27,9 +27,9 @@ from its connection and never stored twice.
 ## What Qably reads from a push
 
 `github.adapter.ts` turns a `push` webhook into one normalized event. From the payload it reads
-`ref` (the branch), `repository.full_name`, `pusher.name` and `head_commit` (id, message, url and
-the `added`, `modified` and `removed` lists). It also reads three fields that describe the whole
-push, not just its last commit:
+`ref` (the branch), `repository.full_name`, `repository.default_branch` (trimmed, `null` when
+missing or blank), `pusher.name` and `head_commit` (id, message, url and the `added`, `modified` and
+`removed` lists). It also reads three fields that describe the whole push, not just its last commit:
 
 - `before`, the commit the ref pointed at before the push. An all-zero value (a newly created ref)
   or anything that is not a 40-character hex sha becomes `null`.
@@ -49,8 +49,8 @@ whole push, either because Qably cut it or because the delivery reached GitHub's
 cap bounds only that list; the changed files below are computed from every delivered commit,
 including the ones that cannot be stored.
 
-Ingestion persists the event with `changedFiles`, `beforeSha`, `forced` and `commitsTruncated`
-(`scm_event`), and the kept commits in the same write (`scm_commit`).
+Ingestion persists the event with `defaultBranch`, `changedFiles`, `beforeSha`, `forced` and
+`commitsTruncated` (`scm_event`), and the kept commits in the same write (`scm_commit`).
 
 ### Changed files are the net effect of the push
 
@@ -72,7 +72,10 @@ it) only `head_commit` is used, as before.
 
 The behavior change is that files from earlier commits of a multi-commit push are now extracted.
 They still pass through `Project.testFilePatterns`, so only matching test files become a
-`CodeChange` and can trigger AI extraction.
+`CodeChange`. Those files trigger AI extraction only when the push is to the repository's default
+branch (or when the default branch is unknown); a push to any other branch or tag still records its
+code changes but extracts nothing. See
+[Which pushes start AI extraction](./RUN_INGESTION.md#which-pushes-start-ai-extraction).
 
 A delivered commit whose id is missing, not a string or not a 40-character hex sha is still replayed
 with the others: its additions, modifications and removals take part in the net effect, so its files
