@@ -42,9 +42,8 @@ interface PendingEvent {
 
 // The official test catalog follows the repository's default branch, so only a
 // push to it seeds proposals. An unknown default branch (a provider that does
-// not report it, an event stored before the column) fails open: skipping would
-// silently stop a project's catalog, while extracting only repeats work the
-// later fingerprint gates can absorb.
+// not report it, an event stored before the column) fails open: that may
+// duplicate proposals, which is preferable to silently stopping a catalog.
 function extractsFromBranch({ branch, defaultBranch }: PendingEvent): boolean {
   return defaultBranch === null || branch === defaultBranch;
 }
@@ -150,7 +149,7 @@ export class IngestionProcessor {
 
     if (!extracts) {
       this.logger.log(
-        `Skipped extraction for ${event.repo}: pushed branch "${event.branch}" is not the default branch "${event.defaultBranch}" (changed files: ${event.changedFiles.length})`,
+        `Skipped extraction for SCM event ${event.id} (organization ${event.organizationId}): pushed ref "${event.branch}" is not the default branch "${event.defaultBranch}" (changed files: ${event.changedFiles.length})`,
       );
     }
 

@@ -558,6 +558,7 @@ describe('IngestionProcessor', () => {
     async function runOn(event: {
       branch: string;
       defaultBranch: string | null;
+      commits?: StoredCommit[];
     }) {
       const prisma = createPrisma({
         ...defaultEvent,
@@ -624,6 +625,58 @@ describe('IngestionProcessor', () => {
       });
     });
 
+    it('records the same code changes whether or not the push is extracted', async () => {
+      const commits = [
+        {
+          sha: '1'.repeat(40),
+          position: 0,
+          attributedFiles: ['src/cart.spec.ts'],
+        },
+      ];
+
+      const skipped = await runOn({
+        branch: 'feat/cart',
+        defaultBranch: 'main',
+        commits,
+      });
+      const extracted = await runOn({
+        branch: 'main',
+        defaultBranch: 'main',
+        commits,
+      });
+
+      const rows = batchCalls(skipped.prisma).map(
+        (call) => call.data.codeChanges.create,
+      );
+
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toEqual([
+        expect.objectContaining({
+          filePath: 'src/cart.spec.ts',
+          commitSha: '1'.repeat(40),
+          detectedPattern: '*.spec.ts',
+        }),
+        expect.objectContaining({
+          filePath: 'src/cart.ts',
+          commitSha: TIP,
+          detectedPattern: null,
+        }),
+      ]);
+      expect(batchCalls(skipped.prisma)).toEqual(batchCalls(extracted.prisma));
+      expect(skipped.extraction.enqueueCodeChanges).not.toHaveBeenCalled();
+      expect(extracted.extraction.enqueueCodeChanges).toHaveBeenCalledTimes(2);
+    });
+
+    it('enqueues no extraction for a tag push, which is never the default branch', async () => {
+      const { prisma, extraction } = await runOn({
+        branch: 'refs/tags/v1',
+        defaultBranch: 'main',
+      });
+
+      expect(prisma.ingestionBatch.create).toHaveBeenCalledTimes(2);
+      expect(extraction.enqueueCodeChanges).not.toHaveBeenCalled();
+    });
+
     it('enqueues extraction for every project when the push is on the default branch', async () => {
       const { extraction } = await runOn({
         branch: 'main',
@@ -653,15 +706,17 @@ describe('IngestionProcessor', () => {
       expect(extraction.enqueueCodeChanges).not.toHaveBeenCalled();
     });
 
-    it('logs one line naming the repository, both branches and the file count when it skips', async () => {
-      await runOn({ branch: 'feat/cart', defaultBranch: 'main' });
+    it('logs one line naming the event, the pushed ref, the default branch and the file count when it skips', async () => {
+      await runOn({ branch: 'refs/tags/v1', defaultBranch: 'main' });
 
       expect(log).toHaveBeenCalledTimes(1);
       const [message] = log.mock.calls[0] as [string];
-      expect(message).toContain('acme/shop');
-      expect(message).toContain('feat/cart');
-      expect(message).toContain('main');
+      expect(message).toContain('event-1');
+      expect(message).toContain('org-1');
+      expect(message).toContain('"refs/tags/v1"');
+      expect(message).toContain('"main"');
       expect(message).toContain('changed files: 2');
+      expect(message).not.toContain('acme/shop');
     });
   });
 

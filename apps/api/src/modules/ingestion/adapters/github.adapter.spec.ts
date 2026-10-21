@@ -189,6 +189,33 @@ describe('GithubAdapter.normalize default branch', () => {
     );
   });
 
+  it('trims the pushed branch too, so the two names compare on equal terms', () => {
+    const event = build().normalize(
+      { ...pushPayload, ref: 'refs/heads/develop \n' },
+      pushHeader,
+    );
+
+    expect(event?.branch).toBe('develop');
+  });
+
+  it('trims the head branch of a pull request', () => {
+    const event = build().normalize(
+      {
+        action: 'opened',
+        repository: { full_name: 'acme/shop' },
+        pull_request: {
+          head: { ref: ' feat/cart ', sha: 'b'.repeat(40) },
+          title: 'Guard the cart',
+          html_url: 'https://github.com/acme/shop/pull/7',
+          user: { login: 'ada' },
+        },
+      },
+      { 'x-github-event': 'pull_request', 'x-github-delivery': 'delivery-pr' },
+    );
+
+    expect(event?.branch).toBe('feat/cart');
+  });
+
   it.each([
     ['missing', {}],
     ['empty', { default_branch: '' }],

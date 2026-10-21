@@ -1065,20 +1065,20 @@ extract  =  defaultBranch is null  OR  branch === defaultBranch
 
 | Field | Where it comes from |
 |---|---|
-| `branch` | `ScmEvent.branch`: the pushed ref without `refs/heads/`. A tag push keeps `refs/tags/...`, so it never equals a branch name. |
+| `branch` | `ScmEvent.branch`: the pushed ref without `refs/heads/`, trimmed. A tag push keeps `refs/tags/...`, so it never equals a branch name. |
 | `defaultBranch` | `ScmEvent.defaultBranch`, stored when the delivery is received. GitHub: `repository.default_branch` of the `push` payload, trimmed. A `pull_request` payload uses the repository the pull request targets, never the fork the head branch lives in. Bitbucket and any payload that omits or blanks the field: `null`. |
 
 Notes:
 
 - **Unknown fails open.** A `null` default branch extracts, as before. The column is nullable and was
   not backfilled, so events stored before it existed read as unknown and behave exactly as they did.
-  Skipping on missing data would silently stop a project's catalog; extracting only repeats work.
+  That may duplicate proposals, which is preferable to silently stopping a project's catalog.
 - The comparison is exact and case-sensitive, like git branch names.
 - The default branch is the one the provider reported on that delivery, so renaming it on GitHub
   takes effect from the next push. Nothing is cached on the connection.
-- A skipped push logs one line (`Skipped extraction for <repo>: pushed branch "..." is not the
-  default branch "..." (changed files: N)`). It carries no commit message or author. The event is
-  still marked `PROCESSED`.
+- A skipped push logs one line (`Skipped extraction for SCM event <id> (organization <id>): pushed
+  ref "..." is not the default branch "..." (changed files: N)`). It names the event by id and carries
+  no repository name, commit message or author. The event is still marked `PROCESSED`.
 - Pull request events and Bitbucket pushes carry no changed files, so they record no batch and never
   extracted; the rule changes nothing for them.
 - Migration `20261021100000_add_scm_event_default_branch` adds the nullable `defaultBranch` column to
