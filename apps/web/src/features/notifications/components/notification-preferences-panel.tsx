@@ -40,7 +40,7 @@ const GROUPS: {
     key: 'review',
     titleKey: 'settings.notifications.groups.review.title',
     descriptionKey: 'settings.notifications.groups.review.description',
-    events: ['proposals_ready'],
+    events: ['proposals_ready', 'extraction_capped'],
   },
   {
     key: 'security',

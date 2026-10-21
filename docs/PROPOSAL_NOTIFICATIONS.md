@@ -101,6 +101,34 @@ A member who already read the notification does not see it become unread when th
 
 Email and webhooks are one-shot per batch. They carry the count the first processed job read, which can be lower than the final number for a push with several files. The in-app notification is the one that converges. The email template has no action link, so only webhooks link to the batch.
 
+## When a push is paused
+
+Every file a push sends to extraction costs one AI credit and one unit of the daily budget, and a push can match any number of files. `EXTRACTION_MAX_FILES_PER_PUSH` bounds that: when the files of one project batch that matched a test pattern are more than the limit, `ExtractionService.enqueueCodeChanges` queues none of them. The push is paused whole, not truncated, because a partial batch would leave tests missing from the review inbox with nothing to show which.
+
+| | |
+|---|---|
+| Setting | `EXTRACTION_MAX_FILES_PER_PUSH`, a positive integer. Default `50`. Not set means 50. An empty value, `0`, a negative number or a decimal stops the API from starting. |
+| Counted | Files of one project batch that matched a test pattern. Files that matched none are not counted. A push to a connection with two projects is judged per project. |
+| At the limit | Exactly the limit is allowed. Only more than the limit pauses the push. |
+| Dedupe key | `extraction_capped:<ingestionBatchId>`, so a second event for the same batch does not duplicate the notification. A repeat keeps the first write and leaves the row as it was. |
+| Event | `extraction.capped`, see [DOMAIN_EVENTS.md](./DOMAIN_EVENTS.md#extractioncapped). |
+
+Nobody loses the signal: every member who has the event on (in-app is on by default, email and webhooks are off) gets one `extraction_capped` notification with severity `high`:
+
+> Proposals were not extracted from 120 test files because the push exceeds the limit of 50.
+
+Its payload is `{ count, limit, projectId, batchId }`, and the web link is `/projects/<projectId>/repository`. Webhook and email copies carry no link. The preference lives under Review in Settings, next to `proposals_ready`.
+
+### Raising the limit
+
+1. Set `EXTRACTION_MAX_FILES_PER_PUSH` to the new value in the API environment and restart the API. The value is read when the API starts.
+2. Check `AERIS_DAILY_BUDGET` first. The cap is the per-push bound and the daily budget is the per-day one, so a higher cap with an unset budget lets one large push spend without limit.
+3. A push that was already paused is not replayed. The next push is judged against the new limit.
+
+### What the log line says
+
+One warning per paused batch: `Extraction paused for project <projectId> batch <batchId>: <count> test files exceed the limit of <limit> per push.` It carries ids and numbers only, never file names or commit data. If the code change rows are gone by the time the cap runs, the push is still paused, the line names the organization instead, and no notification is queued.
+
 ## Limitations
 
 - **At-most-once.** The event bus is in-process and has no outbox. If the process stops between the commit and the publish, that announcement is lost. A retried job finds the proposal already pending and creates nothing, so it does not recover it either.

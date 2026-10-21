@@ -7,6 +7,7 @@ export const DOMAIN_EVENTS = {
   proposalApproved: 'proposal.approved',
   proposalRejected: 'proposal.rejected',
   proposalsCreated: 'proposals.created',
+  extractionCapped: 'extraction.capped',
   scmEventFailed: 'scm_event.failed',
 } as const;
 
@@ -58,6 +59,22 @@ export interface ProposalsCreatedEvent {
   readonly branch?: string;
 }
 
+/**
+ * One push sent more test files to AI extraction than the per-push limit
+ * allows, so none of them was queued. One event announces one project batch.
+ * It carries ids and numbers only: no file names and no commit data.
+ */
+export interface ExtractionCappedEvent {
+  readonly organizationId: string;
+  readonly projectId: string;
+  /** The ingestion batch of this project that was paused. */
+  readonly batchId: string;
+  /** How many files of the batch matched a test pattern. */
+  readonly fileCount: number;
+  /** The `EXTRACTION_MAX_FILES_PER_PUSH` in force when the batch was paused. */
+  readonly limit: number;
+}
+
 export interface ScmEventFailedEvent {
   readonly scmEventId: string;
   readonly organizationId: string;
@@ -69,5 +86,6 @@ export interface DomainEventMap {
   [DOMAIN_EVENTS.proposalApproved]: ProposalApprovedEvent;
   [DOMAIN_EVENTS.proposalRejected]: ProposalRejectedEvent;
   [DOMAIN_EVENTS.proposalsCreated]: ProposalsCreatedEvent;
+  [DOMAIN_EVENTS.extractionCapped]: ExtractionCappedEvent;
   [DOMAIN_EVENTS.scmEventFailed]: ScmEventFailedEvent;
 }

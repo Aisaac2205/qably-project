@@ -31,6 +31,9 @@ const httpUrl = z
     { message: 'must be a bare origin with no path, query or fragment' },
   );
 
+/** Test files one push may send to AI extraction, per project, before the push is paused. */
+const DEFAULT_EXTRACTION_MAX_FILES_PER_PUSH = 50;
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -47,6 +50,11 @@ const envSchema = z.object({
   GEMINI_API_KEY: optionalSecret,
   GEMINI_MODEL: z.string().min(1).default('gemini-3.1-flash-lite'),
   AERIS_DAILY_BUDGET: z.coerce.number().int().positive().optional(),
+  EXTRACTION_MAX_FILES_PER_PUSH: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_EXTRACTION_MAX_FILES_PER_PUSH),
   RESEND_API_KEY: optionalSecret,
   RESEND_FROM_EMAIL: z.string().min(1).optional(),
 });

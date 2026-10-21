@@ -125,6 +125,14 @@ describe('updateNotificationWebhookSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts extraction_capped as a subscribed event type', () => {
+    expect(
+      updateNotificationWebhookSchema.safeParse({
+        eventTypes: ['extraction_capped'],
+      }).success,
+    ).toBe(true);
+  });
+
   it('has no field for the url, so a webhook url can never be changed after creation', () => {
     const parsed = updateNotificationWebhookSchema.parse({ enabled: true });
     expect(parsed).not.toHaveProperty('url');

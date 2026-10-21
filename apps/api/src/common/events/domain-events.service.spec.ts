@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   DOMAIN_EVENTS,
+  type ExtractionCappedEvent,
   type ProposalApprovedEvent,
   type ProposalRejectedEvent,
   type ProposalsCreatedEvent,
@@ -87,6 +88,22 @@ describe('DomainEvents.publish', () => {
 
     expect(emit).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledWith('proposals.created', created);
+  });
+
+  it('emits the capped extraction under the extraction.capped name', () => {
+    const { events, emit } = build();
+    const capped: ExtractionCappedEvent = {
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'batch-1',
+      fileCount: 120,
+      limit: 50,
+    };
+
+    events.publish(DOMAIN_EVENTS.extractionCapped, capped);
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith('extraction.capped', capped);
   });
 
   it('delivers the payload to a listener registered on the real emitter', () => {

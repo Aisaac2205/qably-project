@@ -180,4 +180,24 @@ describe('parseEnv', () => {
       /AERIS_DAILY_BUDGET/,
     );
   });
+
+  it('defaults EXTRACTION_MAX_FILES_PER_PUSH to 50 so a push can never fan out without a bound', () => {
+    expect(parseEnv(validEnv).EXTRACTION_MAX_FILES_PER_PUSH).toBe(50);
+  });
+
+  it('coerces a numeric EXTRACTION_MAX_FILES_PER_PUSH', () => {
+    expect(
+      parseEnv({ ...validEnv, EXTRACTION_MAX_FILES_PER_PUSH: '120' })
+        .EXTRACTION_MAX_FILES_PER_PUSH,
+    ).toBe(120);
+  });
+
+  it.each(['0', '-5', '2.5', 'many'])(
+    'rejects EXTRACTION_MAX_FILES_PER_PUSH=%s because the cap must be a positive integer',
+    (value) => {
+      expect(() =>
+        parseEnv({ ...validEnv, EXTRACTION_MAX_FILES_PER_PUSH: value }),
+      ).toThrow(/EXTRACTION_MAX_FILES_PER_PUSH/);
+    },
+  );
 });

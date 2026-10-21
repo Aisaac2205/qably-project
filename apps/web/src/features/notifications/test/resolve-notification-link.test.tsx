@@ -101,6 +101,31 @@ describe('resolveNotificationLink', () => {
     expect(resolveNotificationLink(notification)).toBeUndefined()
   })
 
+  it('links extraction_capped to the project repository page', () => {
+    const notification = baseNotification({
+      eventType: 'extraction_capped',
+      projectId: 'proj-1',
+      payload: { count: 120, limit: 50, projectId: 'proj-1', batchId: 'batch-7' },
+    })
+    expect(resolveNotificationLink(notification)).toBe('/projects/proj-1/repository')
+  })
+
+  it('falls back to the extraction_capped payload project when the notification has none', () => {
+    const notification = baseNotification({
+      eventType: 'extraction_capped',
+      payload: { count: 120, limit: 50, projectId: 'proj-2', batchId: 'batch-7' },
+    })
+    expect(resolveNotificationLink(notification)).toBe('/projects/proj-2/repository')
+  })
+
+  it('has no destination for extraction_capped when no project can be resolved', () => {
+    const notification = baseNotification({
+      eventType: 'extraction_capped',
+      payload: { count: 120, limit: 50 },
+    })
+    expect(resolveNotificationLink(notification)).toBeUndefined()
+  })
+
   it('has no resolvable destination for connection_security yet', () => {
     const notification = baseNotification({
       eventType: 'connection_security',

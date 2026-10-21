@@ -44,6 +44,10 @@ export function resolveNotificationLink(notification: Notification): string | un
       return undefined
     case 'proposals_ready':
       return proposalsReadyLink(notification)
+    case 'extraction_capped': {
+      const projectId = notification.projectId ?? payloadId(notification, 'projectId')
+      return projectId ? `/projects/${projectId}/repository` : undefined
+    }
     case 'connection_security':
       return undefined
     default:

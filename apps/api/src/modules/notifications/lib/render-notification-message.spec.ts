@@ -131,6 +131,31 @@ describe('renderNotificationMessage', () => {
     expect(plural).not.toMatch(/proposal|ready/i);
   });
 
+  it('renders extraction_capped with the file count and the limit', () => {
+    const message = renderNotificationMessage('en', 'extraction_capped', {
+      count: 120,
+      limit: 50,
+      projectId: 'project-1',
+      batchId: 'batch-1',
+    });
+
+    expect(message).toBe(
+      'Proposals were not extracted from 120 test files because the push exceeds the limit of 50.',
+    );
+  });
+
+  it('renders extraction_capped in Spanish, with no English leaking in', () => {
+    const message = renderNotificationMessage('es', 'extraction_capped', {
+      count: 120,
+      limit: 50,
+    });
+
+    expect(message).toBe(
+      'No se extrajeron propuestas de 120 archivos de prueba porque el push supera el límite de 50.',
+    );
+    expect(message).not.toMatch(/proposals|extracted|exceeds/i);
+  });
+
   it('falls back to the generic template for an unrecognized action value', () => {
     const message = renderNotificationMessage('en', 'connection_security', {
       action: 'Something else',
@@ -214,6 +239,21 @@ describe('renderNotificationSubject', () => {
     expect(
       renderNotificationSubject('es', 'proposals_ready', { count: 4 }),
     ).toBe('4 propuestas listas para revisar');
+  });
+
+  it('renders the extraction_capped subject in English and Spanish', () => {
+    expect(
+      renderNotificationSubject('en', 'extraction_capped', {
+        count: 120,
+        limit: 50,
+      }),
+    ).toBe('Proposal extraction paused: push too large');
+    expect(
+      renderNotificationSubject('es', 'extraction_capped', {
+        count: 120,
+        limit: 50,
+      }),
+    ).toBe('Extracción de propuestas en pausa: push demasiado grande');
   });
 
   it('falls back to the raw event type when the subject catalog is missing an entry', () => {

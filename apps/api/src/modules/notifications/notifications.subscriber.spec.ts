@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
   DOMAIN_EVENTS,
+  type ExtractionCappedEvent,
   type ProposalApprovedEvent,
   type ProposalsCreatedEvent,
   type ScmEventFailedEvent,
@@ -38,6 +39,14 @@ const pushProposals: ProposalsCreatedEvent = {
   commitSha: 'abc1234def',
   author: 'ada',
   branch: 'main',
+};
+
+const capped: ExtractionCappedEvent = {
+  organizationId: 'org-1',
+  projectId: 'project-1',
+  batchId: 'batch-1',
+  fileCount: 120,
+  limit: 50,
 };
 
 const chatProposal: ProposalsCreatedEvent = {
@@ -138,6 +147,74 @@ describe('NotificationsSubscriber', () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
+  });
+
+  describe('extraction capped', () => {
+    it('publishes one high-severity extraction_capped notification keyed by the batch', async () => {
+      events.publish(DOMAIN_EVENTS.extractionCapped, capped);
+      await flush();
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith({
+        eventType: 'extraction_capped',
+        organizationId: 'org-1',
+        severity: 'high',
+        payload: {
+          count: 120,
+          limit: 50,
+          projectId: 'project-1',
+          batchId: 'batch-1',
+        },
+        dedupeKey: 'extraction_capped:batch-1',
+        projectId: 'project-1',
+      });
+    });
+
+    it('keys two projects of the same push apart, because each project owns its own batch', async () => {
+      events.publish(DOMAIN_EVENTS.extractionCapped, capped);
+      events.publish(DOMAIN_EVENTS.extractionCapped, {
+        ...capped,
+        projectId: 'project-2',
+        batchId: 'batch-2',
+      });
+      await flush();
+
+      const keys = (publish.mock.calls as [{ dedupeKey: string }][]).map(
+        ([call]) => call.dedupeKey,
+      );
+      expect(keys).toEqual([
+        'extraction_capped:batch-1',
+        'extraction_capped:batch-2',
+      ]);
+    });
+
+    it('never lets a failing publish reach the emitter, and logs the batch', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      publish.mockRejectedValue(new Error('redis is down'));
+
+      expect(() =>
+        events.publish(DOMAIN_EVENTS.extractionCapped, capped),
+      ).not.toThrow();
+      await flush();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      const [message] = warn.mock.calls[0] as [string];
+      expect(message).toContain('batch-1');
+      expect(message).toContain('redis is down');
+      warn.mockRestore();
+    });
+
+    it('is not triggered by created proposals', async () => {
+      events.publish(DOMAIN_EVENTS.proposalsCreated, pushProposals);
+      await flush();
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'proposals_ready' }),
+      );
+    });
   });
 
   describe('proposals created', () => {

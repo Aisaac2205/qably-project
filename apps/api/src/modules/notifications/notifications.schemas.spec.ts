@@ -27,6 +27,16 @@ describe('updatePreferencesSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts an extraction_capped preference toggle', () => {
+    const result = updatePreferencesSchema.safeParse({
+      preferences: [
+        { eventType: 'extraction_capped', channel: 'email', enabled: true },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it('accepts an explicit locale alongside preferences', () => {
     const result = updatePreferencesSchema.safeParse({
       locale: 'es',

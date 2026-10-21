@@ -66,6 +66,19 @@ describe('NotificationPreferencesPanel', () => {
     ).not.toBeChecked()
   })
 
+  it('offers extraction_capped under Review with in-app on and email off by default', async () => {
+    await act(async () => {
+      render(<NotificationPreferencesPanel />)
+    })
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Extraction paused for large pushes, In-app' }),
+    ).toBeChecked()
+    expect(
+      screen.getByRole('checkbox', { name: 'Extraction paused for large pushes, Email' }),
+    ).not.toBeChecked()
+  })
+
   it('sends the toggled cell to the api when a checkbox is clicked', async () => {
     const user = userEvent.setup()
     await act(async () => {
@@ -89,7 +102,7 @@ describe('NotificationPreferencesPanel', () => {
 
     expect(updatePreferences).toHaveBeenCalledTimes(1)
     const [{ preferences }] = updatePreferences.mock.calls[0]
-    expect(preferences).toHaveLength(12)
+    expect(preferences).toHaveLength(14)
     expect(preferences.every((p: { enabled: boolean }) => p.enabled === false)).toBe(true)
   })
 })

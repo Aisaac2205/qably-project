@@ -755,6 +755,7 @@ enum NotificationEventType {
   ingestion_failed
   connection_security
   proposals_ready
+  extraction_capped
 }
 
 enum NotificationChannel {
