@@ -195,12 +195,25 @@ export class NotificationsProcessor {
       return this.reviewInboxLink(event);
     }
 
+    if (event.eventType === 'extraction_capped') {
+      return this.repositoryLink(event);
+    }
+
     if (event.projectId === undefined || event.runId === undefined) {
       return undefined;
     }
 
     return new URL(
       `/projects/${event.projectId}/runs/${event.runId}`,
+      this.env.WEB_APP_URL,
+    ).toString();
+  }
+
+  private repositoryLink(event: NotificationJobData): string | undefined {
+    if (event.projectId === undefined) return undefined;
+
+    return new URL(
+      `/projects/${encodeURIComponent(event.projectId)}/repository`,
       this.env.WEB_APP_URL,
     ).toString();
   }

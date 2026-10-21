@@ -12,5 +12,5 @@ export const testEnv: Env = {
   GITHUB_CLIENT_ID: 'gh-client-id',
   GITHUB_CLIENT_SECRET: 'gh-client-secret',
   GEMINI_MODEL: 'gemini-3.1-flash-lite',
-  EXTRACTION_MAX_FILES_PER_PUSH: 50,
+  EXTRACTION_MAX_FILES_PER_BATCH: 50,
 };

@@ -72,10 +72,10 @@ describe('NotificationPreferencesPanel', () => {
     })
 
     expect(
-      screen.getByRole('checkbox', { name: 'Extraction paused for large pushes, In-app' }),
+      screen.getByRole('checkbox', { name: 'Extraction skipped for large pushes, In-app' }),
     ).toBeChecked()
     expect(
-      screen.getByRole('checkbox', { name: 'Extraction paused for large pushes, Email' }),
+      screen.getByRole('checkbox', { name: 'Extraction skipped for large pushes, Email' }),
     ).not.toBeChecked()
   })
 

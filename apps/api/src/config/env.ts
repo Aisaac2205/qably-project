@@ -31,8 +31,21 @@ const httpUrl = z
     { message: 'must be a bare origin with no path, query or fragment' },
   );
 
-/** Test files one push may send to AI extraction, per project, before the push is paused. */
-const DEFAULT_EXTRACTION_MAX_FILES_PER_PUSH = 50;
+/**
+ * Test files one ingestion batch (one push, for one project) may send to AI
+ * extraction before the whole batch is skipped. An empty variable counts as
+ * unset, so a blank value in the hosting dashboard keeps the default.
+ */
+const DEFAULT_EXTRACTION_MAX_FILES_PER_BATCH = 50;
+
+const extractionMaxFilesPerBatch = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_EXTRACTION_MAX_FILES_PER_BATCH),
+);
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -50,11 +63,7 @@ const envSchema = z.object({
   GEMINI_API_KEY: optionalSecret,
   GEMINI_MODEL: z.string().min(1).default('gemini-3.1-flash-lite'),
   AERIS_DAILY_BUDGET: z.coerce.number().int().positive().optional(),
-  EXTRACTION_MAX_FILES_PER_PUSH: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(DEFAULT_EXTRACTION_MAX_FILES_PER_PUSH),
+  EXTRACTION_MAX_FILES_PER_BATCH: extractionMaxFilesPerBatch,
   RESEND_API_KEY: optionalSecret,
   RESEND_FROM_EMAIL: z.string().min(1).optional(),
 });

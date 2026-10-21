@@ -167,6 +167,7 @@ describe('NotificationsSubscriber', () => {
         },
         dedupeKey: 'extraction_capped:batch-1',
         projectId: 'project-1',
+        ingestionBatchId: 'batch-1',
       });
     });
 

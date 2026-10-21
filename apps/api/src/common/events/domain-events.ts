@@ -67,11 +67,11 @@ export interface ProposalsCreatedEvent {
 export interface ExtractionCappedEvent {
   readonly organizationId: string;
   readonly projectId: string;
-  /** The ingestion batch of this project that was paused. */
+  /** The ingestion batch of this project that was skipped. */
   readonly batchId: string;
   /** How many files of the batch matched a test pattern. */
   readonly fileCount: number;
-  /** The `EXTRACTION_MAX_FILES_PER_PUSH` in force when the batch was paused. */
+  /** The `EXTRACTION_MAX_FILES_PER_BATCH` in force when the batch was skipped. */
   readonly limit: number;
 }
 

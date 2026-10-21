@@ -251,7 +251,7 @@
       "proposals_ready": "{{count}} proposals are ready for review.",
       "proposals_ready_one": "{{count}} proposal is ready for review.",
       "proposals_ready_other": "{{count}} proposals are ready for review.",
-      "extraction_capped": "Proposals were not extracted from {{count}} test files because the push exceeds the limit of {{limit}}."
+      "extraction_capped": "Proposals were not extracted from {{count}} test files because this push exceeds the limit of {{limit}} test files per push. Push fewer test files at a time to extract them."
     },
     "emailSubject": {
       "run_failed": "Run \"{{runName}}\" failed",
@@ -269,7 +269,7 @@
       "proposals_ready": "{{count}} proposals ready for review",
       "proposals_ready_one": "{{count}} proposal ready for review",
       "proposals_ready_other": "{{count}} proposals ready for review",
-      "extraction_capped": "Proposal extraction paused: push too large"
+      "extraction_capped": "Proposal extraction skipped: push too large"
     },
     "delivery": {
       "sentTo": "Sent to {{channel}}",
@@ -1384,7 +1384,7 @@
         "ingestion_failed": "Ingestion failed",
         "connection_security": "Connection security",
         "proposals_ready": "Proposals ready for review",
-        "extraction_capped": "Extraction paused for large pushes"
+        "extraction_capped": "Extraction skipped for large pushes"
       }
     },
     "webhooks": {

@@ -251,7 +251,7 @@
       "proposals_ready": "Hay {{count}} propuestas listas para revisar.",
       "proposals_ready_one": "Hay {{count}} propuesta lista para revisar.",
       "proposals_ready_other": "Hay {{count}} propuestas listas para revisar.",
-      "extraction_capped": "No se extrajeron propuestas de {{count}} archivos de prueba porque el push supera el límite de {{limit}}."
+      "extraction_capped": "No se extrajeron propuestas de {{count}} archivos de prueba porque este push supera el límite de {{limit}} archivos de prueba por push. Sube menos archivos de prueba por push para extraerlos."
     },
     "emailSubject": {
       "run_failed": "La ejecución \"{{runName}}\" falló",
@@ -269,7 +269,7 @@
       "proposals_ready": "{{count}} propuestas listas para revisar",
       "proposals_ready_one": "{{count}} propuesta lista para revisar",
       "proposals_ready_other": "{{count}} propuestas listas para revisar",
-      "extraction_capped": "Extracción de propuestas en pausa: push demasiado grande"
+      "extraction_capped": "Extracción de propuestas omitida: push demasiado grande"
     },
     "delivery": {
       "sentTo": "Se envió a {{channel}}",
@@ -1384,7 +1384,7 @@
         "ingestion_failed": "Ingesta fallida",
         "connection_security": "Seguridad de la conexión",
         "proposals_ready": "Propuestas listas para revisar",
-        "extraction_capped": "Extracción en pausa por pushes grandes"
+        "extraction_capped": "Extracción omitida en pushes grandes"
       }
     },
     "webhooks": {

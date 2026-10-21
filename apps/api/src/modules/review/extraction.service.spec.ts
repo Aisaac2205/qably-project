@@ -110,7 +110,7 @@ function fakeEvents(): { publish: jest.Mock } {
 }
 
 function fakeEnv(limit = 50): Env {
-  return { EXTRACTION_MAX_FILES_PER_PUSH: limit } as Env;
+  return { EXTRACTION_MAX_FILES_PER_BATCH: limit } as Env;
 }
 
 function build(
@@ -198,7 +198,7 @@ describe('ExtractionService.enqueueCodeChanges', () => {
   });
 });
 
-describe('ExtractionService.enqueueCodeChanges per-push cap', () => {
+describe('ExtractionService.enqueueCodeChanges per-batch cap', () => {
   function matched(count: number) {
     return Array.from({ length: count }, (_, index) => ({
       id: `change-${index + 1}`,
@@ -247,24 +247,36 @@ describe('ExtractionService.enqueueCodeChanges per-push cap', () => {
     );
   });
 
-  it('derives the project and the batch from the code change rows, not from the call', async () => {
-    const queue = createQueue();
+  it('addresses the event to the project and the batch stored on the code changes of the call', async () => {
     const prisma = createPrisma();
+    const events = fakeEvents();
+    const idsOfTheCall = ['change-1', 'change-2'];
+    prisma.codeChange.findFirst.mockImplementation(
+      ({ where }: { where: { id: string } }) =>
+        Promise.resolve(
+          idsOfTheCall.includes(where.id)
+            ? { projectId: 'proj-from-row', batchId: 'batch-from-row' }
+            : null,
+        ),
+    );
 
     await build(
       prisma,
-      queue,
+      createQueue(),
       fakeEncryption(),
       fakeTestFileLocator(),
-      fakeEvents(),
+      events,
       fakeEnv(1),
     ).enqueueCodeChanges(matched(2), 'org-1');
 
-    expect(prisma.codeChange.findFirst).toHaveBeenCalledTimes(1);
-    expect(prisma.codeChange.findFirst).toHaveBeenCalledWith({
-      where: { id: 'change-1' },
-      select: { projectId: true, batchId: true },
-    });
+    expect(events.publish).toHaveBeenCalledTimes(1);
+    expect(events.publish).toHaveBeenCalledWith(
+      DOMAIN_EVENTS.extractionCapped,
+      expect.objectContaining({
+        projectId: 'proj-from-row',
+        batchId: 'batch-from-row',
+      }),
+    );
   });
 
   it('enqueues every target when the push is exactly at the limit', async () => {
@@ -358,13 +370,67 @@ describe('ExtractionService.enqueueCodeChanges per-push cap', () => {
     const [message] = warn.mock.calls[0] as [string];
     expect(message).toContain('proj-1');
     expect(message).toContain('batch-1');
+    expect(message).toContain('skipped');
     expect(message).toContain('4 test files');
-    expect(message).toContain('limit of 3');
+    expect(message).toContain('limit of 3 per batch');
+    expect(message).not.toMatch(/paused/i);
     expect(message).not.toContain('*.spec.ts');
     expect(message).not.toContain('change-1');
   });
 
-  it('still pauses the push when its code change rows cannot be read, but publishes nothing it cannot address', async () => {
+  it('skips the batch without throwing when the code change lookup fails, and logs no file names', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.codeChange.findFirst.mockRejectedValue(
+      new Error('connection reset'),
+    );
+    const events = fakeEvents();
+    const service = build(
+      prisma,
+      queue,
+      fakeEncryption(),
+      fakeTestFileLocator(),
+      events,
+      fakeEnv(1),
+    );
+
+    await expect(service.enqueueCodeChanges(matched(2), 'org-1')).resolves.toBe(
+      0,
+    );
+
+    expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(events.publish).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+    for (const [message] of warn.mock.calls as [string][]) {
+      expect(message).toContain('connection reset');
+      expect(message).not.toContain('*.spec.ts');
+      expect(message).not.toContain('change-1');
+    }
+  });
+
+  it('skips the batch without throwing when publishing the event fails', async () => {
+    const queue = createQueue();
+    const events = fakeEvents();
+    events.publish.mockImplementation(() => {
+      throw new Error('emitter exploded');
+    });
+    const service = build(
+      createPrisma(),
+      queue,
+      fakeEncryption(),
+      fakeTestFileLocator(),
+      events,
+      fakeEnv(1),
+    );
+
+    await expect(service.enqueueCodeChanges(matched(2), 'org-1')).resolves.toBe(
+      0,
+    );
+
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('still skips the push when its code change rows cannot be read, but publishes nothing it cannot address', async () => {
     const queue = createQueue();
     const prisma = createPrisma();
     prisma.codeChange.findFirst.mockResolvedValue(null);

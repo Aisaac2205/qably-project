@@ -1,6 +1,6 @@
 # Domain events
 
-The API publishes a domain fact after it is committed, and the modules that care about it subscribe. The code that publishes does not know who listens, and the code that listens does not know who published. Today the bus carries the review decision events, the proposal creation event, the capped extraction event and the ingestion failure event. Four subscribers listen: one reclassifies a suite after a proposal is approved, the others turn an ingestion failure, a batch of new proposals or a paused push into a notification.
+The API publishes a domain fact after it is committed, and the modules that care about it subscribe. The code that publishes does not know who listens, and the code that listens does not know who published. Today the bus carries the review decision events, the proposal creation event, the capped extraction event and the ingestion failure event. Four subscribers listen: one reclassifies a suite after a proposal is approved, the others turn an ingestion failure, a batch of new proposals or a skipped push into a notification.
 
 Before this bus, `ReviewDecisionService.approve` called `ProposalReclassifier.enqueue` itself, and `reject` told nobody. Now `approve` and `reject` publish an event and stop there. In the same way, `IngestionProcessor` used to call `NotificationsPublisher.publish` when an SCM event failed, so ingestion knew its recipient. Now it publishes `scm_event.failed` and stops there.
 
@@ -62,19 +62,19 @@ Subscriber: `NotificationsSubscriber` queues one `proposals_ready` notification 
 
 ### `extraction.capped`
 
-Published by `ExtractionService.enqueueCodeChanges` when the number of files a project batch sends to AI extraction is above `EXTRACTION_MAX_FILES_PER_PUSH` (default 50). Nothing is queued for that batch: the cap pauses the whole push, because queuing only a part of it would leave tests missing from the review inbox with no sign of which. Each file that would have been queued costs one AI credit and one unit of the daily budget, which is what the cap protects.
+Published by `ExtractionService.enqueueCodeChanges` when the number of files a project batch sends to AI extraction is above `EXTRACTION_MAX_FILES_PER_BATCH` (default 50). Nothing is queued for that batch: the limit skips the whole batch, because queuing only a part of it would leave tests missing from the review inbox with no sign of which. Nothing resumes a skipped batch yet, which is why the organization is told. Each file that would have been queued costs one AI credit and one unit of the daily budget, which is what the limit protects. The limit applies per project batch, so a push to a connection with N projects can queue up to N times the limit.
 
 | Field | Type | Meaning |
 |---|---|---|
 | `organizationId` | string | Organization that owns the project. |
 | `projectId` | string | Project of the batch. Read back from the first code change of the call. |
-| `batchId` | string | The ingestion batch of that project that was paused. |
+| `batchId` | string | The ingestion batch of that project that was skipped. |
 | `fileCount` | number | Files of the batch that matched a test pattern. Files that matched none are not counted. |
-| `limit` | number | The limit in force when the batch was paused. |
+| `limit` | number | The limit in force when the batch was skipped. |
 
-The payload carries ids and numbers only: no file names and no commit data. `ExtractionService` also logs one warning per paused batch with the same ids and numbers. If the code change rows cannot be read, the push stays paused, the log line names the organization, and no event is published because there is nothing to address it to.
+The payload carries ids and numbers only: no file names and no commit data. `ExtractionService` also logs one warning per skipped batch with the same ids and numbers. If the code change rows are gone, the batch is still skipped, the log line names the organization, and no event is published because there is nothing to address it to. The limit check never throws: if reading the rows or publishing fails, the batch is skipped and the error message is logged, because a failing ingestion job would be retried into the unique index on the SCM event and project.
 
-Subscriber: `NotificationsSubscriber` queues one `extraction_capped` notification with severity `high`, payload `{ count, limit, projectId, batchId }`, the project id and the dedupe key `extraction_capped:<ingestionBatchId>`. The web link is `/projects/<projectId>/repository`. See [PROPOSAL_NOTIFICATIONS.md](PROPOSAL_NOTIFICATIONS.md#when-a-push-is-paused). `ReviewModule` already imports `DomainEventsModule`.
+Subscriber: `NotificationsSubscriber` queues one `extraction_capped` notification with severity `high`, payload `{ count, limit, projectId, batchId }`, the project id, the ingestion batch id and the dedupe key `extraction_capped:<ingestionBatchId>`. The web link, and the one in Slack and Discord messages, is `/projects/<projectId>/repository`. See [PROPOSAL_NOTIFICATIONS.md](PROPOSAL_NOTIFICATIONS.md#when-a-push-is-skipped). `ReviewModule` already imports `DomainEventsModule`.
 
 ### `scm_event.failed`
 

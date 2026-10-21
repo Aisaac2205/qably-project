@@ -140,7 +140,7 @@ describe('renderNotificationMessage', () => {
     });
 
     expect(message).toBe(
-      'Proposals were not extracted from 120 test files because the push exceeds the limit of 50.',
+      'Proposals were not extracted from 120 test files because this push exceeds the limit of 50 test files per push. Push fewer test files at a time to extract them.',
     );
   });
 
@@ -151,7 +151,7 @@ describe('renderNotificationMessage', () => {
     });
 
     expect(message).toBe(
-      'No se extrajeron propuestas de 120 archivos de prueba porque el push supera el límite de 50.',
+      'No se extrajeron propuestas de 120 archivos de prueba porque este push supera el límite de 50 archivos de prueba por push. Sube menos archivos de prueba por push para extraerlos.',
     );
     expect(message).not.toMatch(/proposals|extracted|exceeds/i);
   });
@@ -247,13 +247,13 @@ describe('renderNotificationSubject', () => {
         count: 120,
         limit: 50,
       }),
-    ).toBe('Proposal extraction paused: push too large');
+    ).toBe('Proposal extraction skipped: push too large');
     expect(
       renderNotificationSubject('es', 'extraction_capped', {
         count: 120,
         limit: 50,
       }),
-    ).toBe('Extracción de propuestas en pausa: push demasiado grande');
+    ).toBe('Extracción de propuestas omitida: push demasiado grande');
   });
 
   it('falls back to the raw event type when the subject catalog is missing an entry', () => {

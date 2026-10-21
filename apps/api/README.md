@@ -77,6 +77,7 @@ Configuration variables are validated at startup using Zod in `src/config/env.ts
 | `GEMINI_API_KEY` | No | None | API key for Google Gemini. If omitted, extraction and chat are disabled and report the provider as unavailable. |
 | `GEMINI_MODEL` | No | `gemini-3.1-flash-lite` | Gemini model identifier used for extraction and chat. |
 | `AERIS_DAILY_BUDGET` | No | None | Maximum Gemini calls per Pacific calendar day against the platform key, counted in Redis across extraction and chat. If unset, calls are unmetered. |
+| `EXTRACTION_MAX_FILES_PER_BATCH` | No | `50` | Most test files one push may send to AI extraction, counted per project (a push to a connection with N projects can send up to N times this). A batch above it is skipped whole and the organization is notified. An empty value falls back to the default. |
 | `RESEND_API_KEY` | No | None | API key for transactional email through Resend. If omitted, emails are skipped with a warning. |
 | `RESEND_FROM_EMAIL` | No | None | Sender address for outgoing email. |
 

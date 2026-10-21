@@ -35,9 +35,10 @@ export class NotificationsSubscriber {
   }
 
   /**
-   * A paused push is a silent loss unless someone is told, so it is high
+   * A skipped push is a silent loss unless someone is told, so it is high
    * severity. The key is the batch: one push reaches every project of its
-   * connection, and each project pauses its own batch.
+   * connection, and each project skips its own batch. Like a push's
+   * `proposals_ready`, the row carries the ingestion batch.
    */
   @OnEvent(DOMAIN_EVENTS.extractionCapped, { async: true })
   async onExtractionCapped(event: ExtractionCappedEvent): Promise<void> {
@@ -54,6 +55,7 @@ export class NotificationsSubscriber {
         },
         dedupeKey: `extraction_capped:${event.batchId}`,
         projectId: event.projectId,
+        ingestionBatchId: event.batchId,
       });
     } catch (error) {
       this.logger.warn(
