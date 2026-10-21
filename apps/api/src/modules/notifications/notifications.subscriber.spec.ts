@@ -3,6 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import {
   DOMAIN_EVENTS,
   type ProposalApprovedEvent,
+  type ProposalsCreatedEvent,
   type ScmEventFailedEvent,
 } from '../../common/events/domain-events';
 import { DomainEvents } from '../../common/events/domain-events.service';
@@ -26,6 +27,25 @@ const approved: ProposalApprovedEvent = {
   versionId: 'version-1',
   createdNewCase: true,
   actorId: 'user-1',
+};
+
+const pushProposals: ProposalsCreatedEvent = {
+  source: 'push',
+  organizationId: 'org-1',
+  projectId: 'project-1',
+  batchId: 'batch-1',
+  count: 3,
+  commitSha: 'abc1234def',
+  author: 'ada',
+  branch: 'main',
+};
+
+const chatProposal: ProposalsCreatedEvent = {
+  source: 'chat',
+  organizationId: 'org-1',
+  projectId: 'project-1',
+  batchId: 'proposal-9',
+  count: 1,
 };
 
 // The subscriber runs on setImmediate (`async: true`); one more macrotask is
@@ -118,5 +138,130 @@ describe('NotificationsSubscriber', () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
+  });
+
+  describe('proposals created', () => {
+    it('publishes one medium-severity proposals_ready notification keyed by the push batch', async () => {
+      events.publish(DOMAIN_EVENTS.proposalsCreated, pushProposals);
+      await flush();
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith({
+        eventType: 'proposals_ready',
+        organizationId: 'org-1',
+        severity: 'medium',
+        payload: {
+          source: 'push',
+          count: 3,
+          projectId: 'project-1',
+          batchId: 'batch-1',
+          commitSha: 'abc1234def',
+          author: 'ada',
+          branch: 'main',
+        },
+        dedupeKey: 'proposals:push:batch-1',
+        projectId: 'project-1',
+        ingestionBatchId: 'batch-1',
+      });
+    });
+
+    it('keys two projects of the same push apart, because each project owns its own batch', async () => {
+      events.publish(DOMAIN_EVENTS.proposalsCreated, pushProposals);
+      events.publish(DOMAIN_EVENTS.proposalsCreated, {
+        ...pushProposals,
+        projectId: 'project-2',
+        batchId: 'batch-2',
+      });
+      await flush();
+
+      const keys = (publish.mock.calls as [{ dedupeKey: string }][]).map(
+        ([call]) => call.dedupeKey,
+      );
+      expect(keys).toEqual([
+        'proposals:push:batch-1',
+        'proposals:push:batch-2',
+      ]);
+    });
+
+    it('keeps the same key when another job of the same push batch finishes, so the notification is updated in place', async () => {
+      events.publish(DOMAIN_EVENTS.proposalsCreated, pushProposals);
+      events.publish(DOMAIN_EVENTS.proposalsCreated, {
+        ...pushProposals,
+        count: 5,
+      });
+      await flush();
+
+      const keys = (publish.mock.calls as [{ dedupeKey: string }][]).map(
+        ([call]) => call.dedupeKey,
+      );
+      expect(new Set(keys).size).toBe(1);
+    });
+
+    it('leaves the ingestion batch column empty for a source that has no ingestion batch, and omits the push-only fields', async () => {
+      events.publish(DOMAIN_EVENTS.proposalsCreated, chatProposal);
+      await flush();
+
+      expect(publish).toHaveBeenCalledWith({
+        eventType: 'proposals_ready',
+        organizationId: 'org-1',
+        severity: 'medium',
+        payload: {
+          source: 'chat',
+          count: 1,
+          projectId: 'project-1',
+          batchId: 'proposal-9',
+        },
+        dedupeKey: 'proposals:chat:proposal-9',
+        projectId: 'project-1',
+      });
+    });
+
+    it('leaves out a push field the SCM event did not carry instead of publishing an empty one', async () => {
+      events.publish(DOMAIN_EVENTS.proposalsCreated, {
+        ...pushProposals,
+        author: undefined,
+        branch: undefined,
+      });
+      await flush();
+
+      const [call] = publish.mock.calls[0] as [
+        { payload: Record<string, unknown> },
+      ];
+      expect(call.payload).toEqual({
+        source: 'push',
+        count: 3,
+        projectId: 'project-1',
+        batchId: 'batch-1',
+        commitSha: 'abc1234def',
+      });
+    });
+
+    it('never lets a failing publish reach the emitter, and logs the batch', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      publish.mockRejectedValue(new Error('redis is down'));
+
+      expect(() =>
+        events.publish(DOMAIN_EVENTS.proposalsCreated, pushProposals),
+      ).not.toThrow();
+      await flush();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      const [message] = warn.mock.calls[0] as [string];
+      expect(message).toContain('batch-1');
+      expect(message).toContain('redis is down');
+      warn.mockRestore();
+    });
+
+    it('is not triggered by a failed SCM event', async () => {
+      events.publish(DOMAIN_EVENTS.scmEventFailed, failed);
+      await flush();
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'ingestion_failed' }),
+      );
+    });
   });
 });

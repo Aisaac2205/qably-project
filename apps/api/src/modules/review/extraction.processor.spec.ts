@@ -171,6 +171,7 @@ function build(
   entitlement: AiEntitlementService = fakeEntitlement(),
   dailyBudget: AiDailyBudget = fakeDailyBudget(),
   testFileLocator: TestFileLocator = fakeTestFileLocator(),
+  publish: jest.Mock = jest.fn(),
 ) {
   return new ExtractionProcessor(
     prisma as never,
@@ -181,9 +182,12 @@ function build(
     dailyBudget,
     testFileLocator,
     new ExtractionFailureRecorder(prisma as never),
-    new ExtractedProposalWriter(prisma as never, entitlement, {
-      enqueue: jest.fn().mockResolvedValue(undefined),
-    } as never),
+    new ExtractedProposalWriter(
+      prisma as never,
+      entitlement,
+      { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
+      { publish } as never,
+    ),
   );
 }
 
@@ -225,6 +229,139 @@ describe('ExtractionProcessor — code-change job still proposes (CONTEXT.md §4
     expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
     expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
     expect(prisma.testCase.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExtractionProcessor — new proposals notification', () => {
+  const pushBatch = {
+    batchId: 'batch-1',
+    commitSha: 'sha-1',
+    batch: { scmEvent: { author: 'ada', branch: 'main' } },
+  };
+
+  function buildWithPublish(
+    prisma: FakePrisma,
+    extract: jest.Mock,
+    publish: jest.Mock,
+  ) {
+    return build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(extract),
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(),
+      fakeTestFileLocator(),
+      publish,
+    );
+  }
+
+  it('announces the batch of a push once its proposals are saved', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findUnique
+      .mockResolvedValueOnce(codeChangeRow)
+      .mockResolvedValueOnce(pushBatch);
+    const publish = jest.fn();
+
+    await buildWithPublish(
+      prisma,
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+      publish,
+    ).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith('proposals.created', {
+      source: 'push',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'batch-1',
+      count: 1,
+      commitSha: 'sha-1',
+      author: 'ada',
+      branch: 'main',
+    });
+  });
+
+  it('announces a documented case by its proposal id', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      id: 'case-1',
+      projectId: 'project-1',
+      suiteId: 'suite-1',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+      project: { organizationId: 'org-1', connection },
+    });
+    const publish = jest.fn();
+
+    await buildWithPublish(
+      prisma,
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+      publish,
+    ).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith('proposals.created', {
+      source: 'documentation',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'proposal-new',
+      count: 1,
+    });
+  });
+
+  it('announces nothing when the extraction found no tests and the file fell back to manual review', async () => {
+    const prisma = createPrisma();
+    const publish = jest.fn();
+
+    await buildWithPublish(
+      prisma,
+      jest.fn().mockResolvedValue({ kind: 'no-tests-found' }),
+      publish,
+    ).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('announces nothing for a document-file job, which publishes versions directly instead of proposing', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      projectId: 'project-1',
+      project: { organizationId: 'org-1', connection },
+    });
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        id: 'case-1',
+        suiteId: 'suite-1',
+        name: 'adds an item',
+        documentationSource: 'aeris',
+        currentVersion: null,
+      },
+    ]);
+    const publish = jest.fn();
+    const extract = jest
+      .fn()
+      .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+    await buildWithPublish(prisma, extract, publish).process({
+      data: {
+        kind: 'document-file',
+        filePath: 'src/cart.spec.ts',
+        targets: [
+          { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+        ],
+      },
+    } as never);
+
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
   });
 });
 

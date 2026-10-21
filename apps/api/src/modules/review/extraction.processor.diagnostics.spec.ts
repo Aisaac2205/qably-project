@@ -130,9 +130,12 @@ function build(
     } as unknown as AiDailyBudget,
     { locate: jest.fn() } as unknown as TestFileLocator,
     new ExtractionFailureRecorder(prisma as never),
-    new ExtractedProposalWriter(prisma as never, entitlement, {
-      enqueue: jest.fn().mockResolvedValue(undefined),
-    } as never),
+    new ExtractedProposalWriter(
+      prisma as never,
+      entitlement,
+      { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
+      { publish: jest.fn() } as never,
+    ),
   );
 
   const warn = jest

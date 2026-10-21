@@ -1,3 +1,6 @@
+import { Logger } from '@nestjs/common';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
+import type { DomainEvents } from '../../common/events/domain-events.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { ExtractedCase } from '../ai/extraction.contracts';
 import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
@@ -43,6 +46,7 @@ function jobContext(overrides: Partial<JobContext> = {}): JobContext {
 }
 
 interface FakePrisma {
+  codeChange: { findUnique: jest.Mock };
   testCase: { findFirst: jest.Mock; findMany: jest.Mock };
   suite: { findFirst: jest.Mock };
   evidence: { create: jest.Mock; update: jest.Mock };
@@ -59,6 +63,13 @@ interface FakePrisma {
 
 function createPrisma(): FakePrisma {
   const prisma: FakePrisma = {
+    codeChange: {
+      findUnique: jest.fn().mockResolvedValue({
+        batchId: 'batch-1',
+        commitSha: 'abc1234def',
+        batch: { scmEvent: { author: 'ada', branch: 'main' } },
+      }),
+    },
     testCase: {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
@@ -100,15 +111,21 @@ function fakeReclassifier(
   return { enqueue } as unknown as ProposalReclassifier;
 }
 
+function fakeEvents(publish: jest.Mock = jest.fn()): DomainEvents {
+  return { publish } as unknown as DomainEvents;
+}
+
 function build(
   prisma: FakePrisma,
   entitlement: AiEntitlementService,
   reclassifier: ProposalReclassifier = fakeReclassifier(),
+  events: DomainEvents = fakeEvents(),
 ) {
   return new ExtractedProposalWriter(
     prisma as never,
     entitlement,
     reclassifier,
+    events,
   );
 }
 
@@ -445,5 +462,337 @@ describe('ExtractedProposalWriter.persistExtracted — reclassify trigger', () =
 
     expect(persisted).toBe(false);
     expect(enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExtractedProposalWriter.persistExtracted — proposals created event', () => {
+  const pushContext = () => jobContext({ codeChangeId: 'change-1' });
+
+  it('announces a push batch once, with the number of proposals the job created', async () => {
+    const prisma = createPrisma();
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted(
+      [
+        extractedCase(),
+        extractedCase({ automationKey: 'Cart > removes an item' }),
+      ],
+      pushContext(),
+    );
+
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith(DOMAIN_EVENTS.proposalsCreated, {
+      source: 'push',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'batch-1',
+      count: 2,
+      commitSha: 'abc1234def',
+      author: 'ada',
+      branch: 'main',
+    });
+    expect(prisma.codeChange.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'change-1' } }),
+    );
+  });
+
+  it('publishes only after the transaction has committed, never inside it', async () => {
+    const prisma = createPrisma();
+    let committed = false;
+    prisma.$transaction.mockImplementation(
+      async (run: (tx: FakePrisma) => unknown) => {
+        const result = await run(prisma);
+        committed = true;
+        return result;
+      },
+    );
+    const publish = jest.fn(() => {
+      expect(committed).toBe(true);
+    });
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted([extractedCase()], pushContext());
+
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts only the proposals it created, not the pending ones a redelivery refreshed', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      {
+        id: 'pending-1',
+        status: 'in_review',
+        evidenceId: 'evidence-1',
+        automationKey: 'Cart > adds an item',
+      },
+    ]);
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted(
+      [
+        extractedCase(),
+        extractedCase({ automationKey: 'Cart > removes an item' }),
+      ],
+      pushContext(),
+    );
+
+    expect(publish).toHaveBeenCalledWith(
+      DOMAIN_EVENTS.proposalsCreated,
+      expect.objectContaining({ count: 1 }),
+    );
+  });
+
+  it('publishes nothing when the job only refreshed or skipped existing proposals', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      {
+        id: 'pending-1',
+        status: 'in_review',
+        evidenceId: 'evidence-1',
+        automationKey: 'Cart > adds an item',
+      },
+      {
+        id: 'decided-1',
+        status: 'approved',
+        evidenceId: 'evidence-2',
+        automationKey: 'Cart > removes an item',
+      },
+    ]);
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    const persisted = await writer.persistExtracted(
+      [
+        extractedCase(),
+        extractedCase({ automationKey: 'Cart > removes an item' }),
+      ],
+      pushContext(),
+    );
+
+    expect(persisted).toBe(true);
+    expect(publish).not.toHaveBeenCalled();
+    expect(prisma.codeChange.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('publishes nothing when the create lost a race to another job', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.create.mockRejectedValueOnce(
+      Object.assign(new Error('duplicate'), { code: 'P2002' }),
+    );
+    prisma.extractedProposal.findFirst.mockResolvedValueOnce({
+      id: 'winner-1',
+      status: 'in_review',
+      evidenceId: 'evidence-winner',
+    });
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted([extractedCase()], pushContext());
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('publishes nothing when a proposal is already pending for the target case', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValueOnce({
+      id: 'existing-pending',
+    });
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted(
+      [extractedCase()],
+      jobContext({ targetTestCaseId: 'case-1' }),
+    );
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('publishes nothing when the entitlement credit spend is rejected', async () => {
+    const prisma = createPrisma();
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(jest.fn().mockResolvedValue(false)),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted([extractedCase()], pushContext());
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('publishes nothing when the transaction throws', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.create.mockRejectedValueOnce(
+      new Error('connection reset'),
+    );
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await expect(
+      writer.persistExtracted([extractedCase()], pushContext()),
+    ).rejects.toThrow('connection reset');
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('leaves out the SCM details when the push event is no longer on record', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findUnique.mockResolvedValue({
+      batchId: 'batch-1',
+      commitSha: '',
+      batch: { scmEvent: null },
+    });
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted([extractedCase()], pushContext());
+
+    expect(publish).toHaveBeenCalledWith(DOMAIN_EVENTS.proposalsCreated, {
+      source: 'push',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'batch-1',
+      count: 1,
+    });
+  });
+
+  it('keeps the job successful when the batch lookup fails after the commit', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findUnique.mockRejectedValue(new Error('db gone'));
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await expect(
+      writer.persistExtracted([extractedCase()], pushContext()),
+    ).resolves.toBe(true);
+
+    expect(publish).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('db gone'));
+    warn.mockRestore();
+  });
+
+  it('keeps the job successful when the code change disappeared after the commit', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findUnique.mockResolvedValue(null);
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await expect(
+      writer.persistExtracted([extractedCase()], pushContext()),
+    ).resolves.toBe(true);
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('announces a documented case by its proposal id, since a documentation request creates a single proposal', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.create.mockResolvedValue({ id: 'proposal-77' });
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted(
+      [extractedCase()],
+      jobContext({ targetTestCaseId: 'case-1' }),
+    );
+
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith(DOMAIN_EVENTS.proposalsCreated, {
+      source: 'documentation',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'proposal-77',
+      count: 1,
+    });
+    expect(prisma.codeChange.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('announces each proposal of a single-proposal source on its own, so every batch id matches one inbox row', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.create
+      .mockResolvedValueOnce({ id: 'proposal-a' })
+      .mockResolvedValueOnce({ id: 'proposal-b' });
+    const publish = jest.fn();
+    const writer = build(
+      prisma,
+      fakeEntitlement(),
+      fakeReclassifier(),
+      fakeEvents(publish),
+    );
+
+    await writer.persistExtracted(
+      [
+        extractedCase(),
+        extractedCase({ automationKey: 'Cart > removes an item' }),
+      ],
+      jobContext(),
+    );
+
+    const batches = publish.mock.calls.map(
+      ([, event]: [string, { batchId: string }]) => event.batchId,
+    );
+    expect(batches).toEqual(['proposal-a', 'proposal-b']);
   });
 });
