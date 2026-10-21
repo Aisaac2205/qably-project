@@ -1071,7 +1071,7 @@ describe('ExtractedProposalWriter.persistExtracted — one open proposal per tes
       });
     });
 
-    it('looks among the proposals of the same project, key and file that are still in review, newest first', async () => {
+    it('looks among the proposals of the same project, key and file in any status, so a decided newer one is seen', async () => {
       const prisma = createPrisma();
       const writer = build(prisma, fakeEntitlement());
 
@@ -1090,12 +1090,11 @@ describe('ExtractedProposalWriter.persistExtracted — one open proposal per tes
           automationKey: {
             in: ['Cart > adds an item', 'Cart > removes an item'],
           },
-          status: 'in_review',
           codeChangeId: { not: 'change-2' },
           codeChange: { filePath: 'src/cart.spec.ts' },
         },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
+      expect(crossPushLookups(prisma)[0].where).not.toHaveProperty('status');
     });
 
     it('creates a new proposal when the same key only exists in another file', async () => {
@@ -1137,26 +1136,38 @@ describe('ExtractedProposalWriter.persistExtracted — one open proposal per tes
       },
     );
 
-    it('refreshes only the newest proposal when duplicates are open, leaving the others untouched', async () => {
+    // Duplicates: the one owned by the newest push is the live one. The
+    // proposals' own creation times are set the other way round on purpose, so
+    // ordering by them would pick the wrong one.
+    it('refreshes only the proposal of the newest owning push when duplicates are open, leaving the others untouched', async () => {
       const prisma = createPrisma();
       seedProposals(prisma, [
         storedProposal({
-          id: 'oldest',
-          evidenceId: 'evidence-oldest',
-          createdAt: new Date('2026-10-20T08:00:00.000Z'),
-          change: { id: 'change-0' },
+          id: 'oldest-owner',
+          evidenceId: 'evidence-oldest-owner',
+          createdAt: new Date('2026-10-20T11:00:00.000Z'),
+          change: {
+            id: 'change-0',
+            createdAt: new Date('2026-10-20T08:00:00.000Z'),
+          },
         }),
         storedProposal({
-          id: 'newest',
-          evidenceId: 'evidence-newest',
-          createdAt: new Date('2026-10-20T10:00:00.000Z'),
-          change: { id: 'change-1' },
-        }),
-        storedProposal({
-          id: 'middle',
-          evidenceId: 'evidence-middle',
+          id: 'newest-owner',
+          evidenceId: 'evidence-newest-owner',
           createdAt: new Date('2026-10-20T09:00:00.000Z'),
-          change: { id: 'change-0b' },
+          change: {
+            id: 'change-1',
+            createdAt: new Date('2026-10-20T10:00:00.000Z'),
+          },
+        }),
+        storedProposal({
+          id: 'middle-owner',
+          evidenceId: 'evidence-middle-owner',
+          createdAt: new Date('2026-10-20T10:30:00.000Z'),
+          change: {
+            id: 'change-0b',
+            createdAt: new Date('2026-10-20T09:00:00.000Z'),
+          },
         }),
       ]);
       const writer = build(prisma, fakeEntitlement());
@@ -1165,14 +1176,53 @@ describe('ExtractedProposalWriter.persistExtracted — one open proposal per tes
 
       expect(prisma.extractedProposal.updateMany).toHaveBeenCalledTimes(1);
       expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
-        id: 'newest',
+        id: 'newest-owner',
         status: 'in_review',
       });
       expect(prisma.evidence.update).toHaveBeenCalledTimes(1);
       expect(lastCall(prisma.evidence.update).where).toEqual({
-        id: 'evidence-newest',
+        id: 'evidence-newest-owner',
       });
       expect(prisma.extractedProposal.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('breaks a tie between the owning pushes of duplicates by the code change id', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({ id: 'owner-a', change: { id: 'change-a' } }),
+        storedProposal({ id: 'owner-b', change: { id: 'change-b' } }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'owner-b',
+        status: 'in_review',
+      });
+    });
+
+    it('skips a decided duplicate of an older push and refreshes the open one', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'older-decided',
+          status: 'approved',
+          change: { id: 'change-0b', createdAt: new Date(OLDER.getTime() + 1) },
+        }),
+        storedProposal({
+          id: 'older-open',
+          change: { id: 'change-0', createdAt: OLDER },
+        }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'older-open',
+        status: 'in_review',
+      });
     });
 
     it('does not announce a push whose proposals were all refreshed', async () => {
@@ -1467,7 +1517,38 @@ describe('ExtractedProposalWriter.persistExtracted — one open proposal per tes
       expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     });
 
-    it('still refreshes an older push when a newer one only holds a decided proposal', async () => {
+    // A late job holds older content than a proposal a human already decided.
+    // Opening a new proposal from it could roll the case back on approval.
+    it.each(['approved', 'rejected', 'changes_requested'])(
+      'opens nothing when the newer push proposal was already %s',
+      async (status) => {
+        const prisma = createPrisma();
+        seedProposals(prisma, [
+          storedProposal({
+            id: 'newer-decided',
+            status,
+            change: newerOwner,
+          }),
+        ]);
+        const publish = jest.fn();
+        const writer = build(
+          prisma,
+          fakeEntitlement(),
+          fakeReclassifier(),
+          fakeEvents(publish),
+        );
+
+        await writer.persistExtracted([extractedCase()], secondPush());
+
+        expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+        expect(prisma.evidence.create).not.toHaveBeenCalled();
+        expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+        expect(prisma.evidence.update).not.toHaveBeenCalled();
+        expect(publish).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not refresh an older open proposal either when a newer push holds a decided one', async () => {
       const prisma = createPrisma();
       seedProposals(prisma, [
         storedProposal({
@@ -1481,9 +1562,32 @@ describe('ExtractedProposalWriter.persistExtracted — one open proposal per tes
 
       await writer.persistExtracted([extractedCase()], secondPush());
 
-      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
-        id: 'older-open',
-        status: 'in_review',
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('still handles the other cases when a newer push holds a decided one for one of them', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'newer-decided',
+          status: 'rejected',
+          change: newerOwner,
+        }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [
+          extractedCase(),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ],
+        secondPush(),
+      );
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({
+        automationKey: 'Cart > removes an item',
       });
     });
 

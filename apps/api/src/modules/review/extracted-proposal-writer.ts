@@ -25,9 +25,9 @@ function fileLockKey(projectId: string, filePath: string): string {
   return JSON.stringify([projectId, filePath]);
 }
 
-// The open proposals other code changes of the same file own, split by whether
-// the push that owns them is older or newer than the one being persisted.
-interface OpenProposalsOfOtherPushes {
+// What other code changes of the same file own, split by whether the push that
+// owns it is older or newer than the one being persisted.
+interface ProposalsOfOtherPushes {
   olderByKey: Map<string, ExistingProposal>;
   newerKeys: Set<string>;
 }
@@ -121,7 +121,7 @@ export class ExtractedProposalWriter {
         ctx.codeChangeCreatedAt === undefined ||
         cases.length === 0
           ? null
-          : await this.findOpenProposalsOfOtherPushes(
+          : await this.findProposalsOfOtherPushes(
               tx,
               ctx,
               { id: ctx.codeChangeId, createdAt: ctx.codeChangeCreatedAt },
@@ -164,8 +164,9 @@ export class ExtractedProposalWriter {
           );
 
           if (inThisChange === undefined && otherPushes !== null) {
-            // A newer push already owns an open proposal for this case: this
-            // job ran late and has nothing to add. Writing would undo it.
+            // A newer push already owns a proposal for this case, open or
+            // decided: this job ran late and has nothing to add. Writing would
+            // undo it, or roll the case back on approval.
             if (otherPushes.newerKeys.has(testCase.automationKey)) continue;
 
             const fromEarlierPush = otherPushes.olderByKey.get(
@@ -379,30 +380,35 @@ export class ExtractedProposalWriter {
   }
 
   /**
-   * The proposals still in review that other code changes of the same project
+   * The proposals, in any status, that other code changes of the same project
    * and file own, for these keys.
    *
-   * `olderByKey` holds, per key, the newest proposal owned by a push older than
-   * this one: the one to refresh. When duplicates exist the others stay as they
-   * are for the owner to clean up. `newerKeys` holds the keys a newer push owns
-   * already. The queue runs two jobs at a time and retries with a backoff, so
-   * pushes persist out of order, and this job must not undo a newer one.
+   * `newerKeys` holds the keys a newer push owns a proposal for, decided or
+   * not. The queue runs two jobs at a time and retries with a backoff, so
+   * pushes persist out of order, and a late job holds older content than a
+   * proposal someone already approved or rejected: opening a new one from it
+   * could roll the case back on approval.
+   *
+   * `olderByKey` holds, per key, the proposal still in review that the newest
+   * older push owns: the one to refresh. "Newest" is the order of the owning
+   * pushes, not the proposals' own creation times, because a carried-over
+   * proposal keeps its age while it moves to each new push. A key owns at most
+   * one proposal per code change, so the order is strict. When duplicates
+   * exist the others stay as they are for the owner to clean up.
    */
-  async findOpenProposalsOfOtherPushes(
+  async findProposalsOfOtherPushes(
     tx: TxClient,
     ctx: JobContext,
     current: { id: string; createdAt: Date },
     automationKeys: readonly string[],
-  ): Promise<OpenProposalsOfOtherPushes> {
+  ): Promise<ProposalsOfOtherPushes> {
     const rows = (await tx.extractedProposal.findMany({
       where: {
         projectId: ctx.projectId,
         automationKey: { in: [...automationKeys] },
-        status: 'in_review',
         codeChangeId: { not: current.id },
         codeChange: { filePath: ctx.filePath },
       },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         status: true,
@@ -412,17 +418,25 @@ export class ExtractedProposalWriter {
       },
     })) as OtherPushProposalRow[];
 
-    const found: OpenProposalsOfOtherPushes = {
+    const found: ProposalsOfOtherPushes = {
       olderByKey: new Map(),
       newerKeys: new Set(),
     };
+    const ownerOfOlder = new Map<string, { id: string; createdAt: Date }>();
 
     for (const row of rows) {
       if (row.automationKey === null || row.codeChange === null) continue;
 
       if (isNewerPush(row.codeChange, current)) {
         found.newerKeys.add(row.automationKey);
-      } else if (!found.olderByKey.has(row.automationKey)) {
+        continue;
+      }
+
+      if (row.status !== 'in_review') continue;
+
+      const best = ownerOfOlder.get(row.automationKey);
+      if (best === undefined || isNewerPush(row.codeChange, best)) {
+        ownerOfOlder.set(row.automationKey, row.codeChange);
         found.olderByKey.set(row.automationKey, row);
       }
     }

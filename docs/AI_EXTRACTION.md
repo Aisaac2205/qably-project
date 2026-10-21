@@ -557,21 +557,21 @@ The unit suite mocks Prisma, so it cannot exercise real Postgres transaction-abo
 
 The guard above only looks inside one code change (`codeChangeId + automationKey`), so it stops a redelivery and nothing else. Every push that touches a test file runs `code-change` extraction of the whole file again, and the model paraphrases the same tests a little differently each time. Without a second rule, a byte-identical re-push opened a second proposal for every case that was still waiting in the inbox.
 
-Before it creates anything, `ExtractedProposalWriter.persistExtracted` looks for the open proposals of the same cases in **other** code changes (`findOpenProposalsOfOtherPushes`, one `findMany` for the whole batch):
+Before it creates anything, `ExtractedProposalWriter.persistExtracted` looks for the proposals of the same cases in **other** code changes (`findProposalsOfOtherPushes`, one `findMany` for the whole batch):
 
 | Match | Value |
 |---|---|
 | Project | `projectId` of the job |
 | Case | `automationKey` |
 | Source file | `codeChange.filePath` equals the file being extracted |
-| State | `status = in_review` |
+| State | any: decided proposals are read too, see below |
 
 The file is part of the match on purpose. jest keys are `"describe it"` and can repeat in two files, so project and key alone could merge two different tests.
 
 Each match is then sorted by the push that owns it, using `CodeChange.createdAt` (carried into the job as `JobContext.codeChangeCreatedAt`) and the code change `id` as the tie-break:
 
-- **Owned by an older push:** the newest such proposal is refreshed instead of creating a new one (below).
-- **Owned by a newer push:** the case is skipped. No proposal is created, refreshed or moved. The queue runs two jobs at a time and retries with an exponential backoff, so pushes persist out of order; without this, a late job for an older push would overwrite what the newer push wrote and move the proposal back.
+- **Owned by an older push, still in review:** the proposal owned by the newest such push is refreshed instead of creating a new one (below). The order is that of the owning pushes, not the proposals' own `createdAt`, because a carried-over proposal keeps its age while it moves to each new push.
+- **Owned by a newer push, in any status:** the case is skipped. No proposal is created, refreshed or moved. The queue runs two jobs at a time and retries with an exponential backoff, so pushes persist out of order. A late job for an older push would overwrite what the newer push wrote and move the proposal back; and if the newer push's proposal was already approved or rejected, a new proposal opened from the older content could roll the case back when approved.
 
 #### What a refresh writes
 
@@ -596,8 +596,8 @@ It **never writes `status`**, `createdAt`, or the review decisions. A refresh cr
 
 What the rule leaves alone:
 
-- **Decided proposals.** `approved`, `rejected` and `changes_requested` proposals of earlier pushes are not refreshed. A later push that still extracts the case opens a new one, as before.
-- **Duplicates that already exist.** Production holds pairs of open proposals for the same case. Only the newest (by `createdAt`, then `id`) is refreshed; the others stay as they are and need a manual clean-up.
+- **Decided proposals of older pushes.** `approved`, `rejected` and `changes_requested` proposals owned by older pushes are not refreshed. A later push that still extracts the case opens a new one, as before. A decided proposal owned by a *newer* push does the opposite: it stops the older push from writing anything for that case.
+- **Duplicates that already exist.** Production holds pairs of open proposals for the same case. Only the one owned by the newest push (by the owner's `createdAt`, then its `id`) is refreshed; the others stay as they are and need a manual clean-up.
 - **The same push.** A proposal that already belongs to the current code change keeps the redelivery behaviour above and is not moved. It is refreshed with the same conditional update.
 - **Other sources.** `document-case` proposals have no code change and are untouched.
 
