@@ -527,7 +527,7 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
     expect(store.snapshotOf('change-2')?.removed).toEqual([]);
   });
 
-  it('describes a whole file the first time, in chunks of at most twenty, and stamps it', async () => {
+  it('describes a whole file the first time, in calls of at most fifteen tests, and stamps it', async () => {
     const store = harness();
     store.push('change-1', 1, testFile(FORTY));
     quietLogs();
@@ -535,11 +535,12 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
     await store.run('change-1', { answer: answerTargets });
 
     expect(requestedTitles(store)).toEqual([
-      numbered(20),
-      numbered(40).slice(20),
+      FORTY.slice(0, 15),
+      FORTY.slice(15, 30),
+      FORTY.slice(30),
     ]);
     expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(40);
-    expect(store.tryConsume).toHaveBeenCalledTimes(2);
+    expect(store.tryConsume).toHaveBeenCalledTimes(3);
     expect(store.spendCredit).toHaveBeenCalledTimes(1);
     expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
   });
@@ -552,10 +553,81 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
     await store.run('change-1', { answer: answerTargets });
 
     expect(requestedTitles(store).map((titles) => titles.length)).toEqual([
-      20, 20, 5,
+      15, 15, 15,
     ]);
     expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(45);
     expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+  });
+
+  describe('a table', () => {
+    /** Two plain tests around one `it.each` table of `rows` literal rows. */
+    const withTable = (rows: number) =>
+      [
+        "import { describe, expect, it } from '@jest/globals';",
+        "describe('Cart', () => {",
+        "  it('adds', () => { expect(1).toBe(1); });",
+        `  it.each([${Array.from({ length: rows }, (_, row) => `[${row}]`).join(', ')}])('keeps %i', (n) => {`,
+        '    expect(n).toBe(n);',
+        '  });',
+        "  it('removes', () => { expect(0).toBe(0); });",
+        '});',
+      ].join('\n');
+
+    /** One case per row for the table, one case for any other target. */
+    const answerRows =
+      (rows: number) =>
+      (input: ExtractionInput): ExtractionOutcome =>
+        extracted(
+          (input.targetDeclarations ?? []).flatMap((target, index) => {
+            const tag = `T${index + 1}`;
+            if (!target.parametrized) {
+              return [
+                {
+                  ...extractedCase(`Cart ${target.title}`),
+                  targetRef: tag,
+                },
+              ];
+            }
+            return Array.from({ length: rows }, (_, row) => ({
+              ...extractedCase(`Cart keeps ${row}`),
+              targetRef: tag,
+            }));
+          }),
+        );
+
+    it('goes to the model alone, between the plain tests around it', async () => {
+      const store = harness();
+      store.push('change-1', 1, withTable(3));
+      quietLogs();
+
+      await store.run('change-1', { answer: answerRows(3) });
+
+      expect(requestedTitles(store)).toEqual([
+        ['adds'],
+        ['keeps %i'],
+        ['removes'],
+      ]);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(5);
+      expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('with more rows than one answer can hold leaves the push unstamped', async () => {
+      const store = harness();
+      store.push('change-1', 1, withTable(25));
+      quietLogs();
+
+      await store.run('change-1', {
+        answer: (input) => {
+          const full = answerRows(25)(input);
+          return full.kind === 'extracted'
+            ? { ...full, cases: full.cases.slice(0, 20) }
+            : full;
+        },
+      });
+
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(22);
+      expect(store.changes.get('change-1')?.extractedAt).toBeNull();
+    });
   });
 
   it('sends only the tests of the describe whose hook changed', async () => {
@@ -898,7 +970,7 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
       await store.run('change-1', { answer: answerTargets });
 
       expect(store.extract).toHaveBeenCalledTimes(1);
-      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(20);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(15);
       expect(store.changes.get('change-1')?.extractedAt).toBeNull();
     });
 

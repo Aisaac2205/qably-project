@@ -169,18 +169,39 @@ function snapshotColumn(
   return snapshot === null ? Prisma.DbNull : snapshot;
 }
 
-/** The changed declarations, in source order, one model call's worth each. */
+/**
+ * Plain tests per model call. Below `MAX_EXTRACTED_CASES`, so a model that
+ * answers a few extra cases does not push a requested one past the cap.
+ */
+const PLAIN_TARGETS_PER_CALL = 15;
+
+/**
+ * The changed declarations, in source order, one model call's worth each:
+ * plain tests in groups of at most `PLAIN_TARGETS_PER_CALL`, and every table
+ * (`.each`/`.for`) alone, since it is answered with one case per row and its
+ * rows alone can fill the cap.
+ */
 function chunkTargets(
   declarations: readonly SnapshotDeclaration[],
 ): SnapshotDeclaration[][] {
   const chunks: SnapshotDeclaration[][] = [];
-  for (
-    let start = 0;
-    start < declarations.length;
-    start += MAX_EXTRACTED_CASES
-  ) {
-    chunks.push(declarations.slice(start, start + MAX_EXTRACTED_CASES));
+  let plain: SnapshotDeclaration[] = [];
+  const flush = (): void => {
+    if (plain.length > 0) chunks.push(plain);
+    plain = [];
+  };
+
+  for (const declaration of declarations) {
+    if (declaration.parametrized) {
+      flush();
+      chunks.push([declaration]);
+      continue;
+    }
+    plain.push(declaration);
+    if (plain.length === PLAIN_TARGETS_PER_CALL) flush();
   }
+  flush();
+
   return chunks;
 }
 
@@ -1716,8 +1737,9 @@ export class ExtractionProcessor {
     // A file that hit the case cap lost cases the model could not return, so
     // it must be extracted again next time instead of being taken for done.
     // The count that matters is the model's own, before duplicates are merged.
-    // (A file the parser reads takes the targeted extraction, which has no
-    // cap. For the rest this is the only signal that is exact: a regex count
+    // (A file the parser reads takes the targeted extraction, which splits its
+    // tests over as many calls as it needs and applies the same cap rule per
+    // call. For the rest this is the only signal that is exact: a regex count
     // of declarations overcounts.)
     if (outcome.cases.length >= MAX_EXTRACTED_CASES) {
       this.logger.log(
@@ -1755,8 +1777,8 @@ export class ExtractionProcessor {
   /**
    * The code-change extraction of a file the parser reads. The declarations
    * are compared with the baseline push of the file; only the new and changed
-   * ones go to the model, as explicit targets, at most `MAX_EXTRACTED_CASES`
-   * per call, and every other test of the file produces nothing.
+   * ones go to the model, as explicit targets (see `chunkTargets` for how many
+   * per call), and every other test of the file produces nothing.
    *
    * Cost: one unit of the daily budget per model call (on the first attempt
    * only, like every other job), and one credit for the job, spent when its
@@ -1828,14 +1850,24 @@ export class ExtractionProcessor {
       }
 
       answered = true;
+      const returned = outcome.kind === 'extracted' ? outcome.cases : [];
       const round = matchTargetedCases(
         targets,
         job.declared.declarations,
-        outcome.kind === 'extracted' ? outcome.cases : [],
+        returned,
         job.content,
       );
       matched.push(...round.matched.map(({ testCase }) => testCase));
-      described += targets.length - round.missing.length;
+      // An answer at the cap may have lost cases the extractor cut, rows of a
+      // table above all: what it matched is saved, but none of its targets
+      // counts as described, so the push stays unstamped.
+      if (returned.length >= MAX_EXTRACTED_CASES) {
+        this.logger.log(
+          `A model call for ${ctx.filePath} reached the ${String(MAX_EXTRACTED_CASES)}-case cap: its ${String(targets.length)} declaration(s) count as not described`,
+        );
+      } else {
+        described += targets.length - round.missing.length;
+      }
       if (round.dropped > 0) {
         this.logger.log(
           `Dropped ${String(round.dropped)} case(s) of ${ctx.filePath} that describe no requested declaration`,
