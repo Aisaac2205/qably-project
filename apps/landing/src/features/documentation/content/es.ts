@@ -1,3 +1,4 @@
+import { guidePages } from './guides';
 import { API_BASE_URL_TOKEN, type DocContent } from './types';
 
 export const es: DocContent = {
@@ -19,7 +20,10 @@ export const es: DocContent = {
   },
   navGroups: [
     { label: 'Primeros pasos', pageSlugs: ['overview', 'quickstart', 'other-runners'] },
-    { label: 'Buenas prácticas', pageSlugs: ['naming-tests'] },
+    {
+      label: 'Buenas prácticas',
+      pageSlugs: ['write-a-case', 'naming-tests', 'what-to-test', 'case-health', 'regressions'],
+    },
     {
       label: 'Referencia',
       pageSlugs: ['api-ingest', 'api-ingest-junit', 'api-webhooks', 'api-keys', 'env-vars'],
@@ -1098,5 +1102,6 @@ response.raise_for_status()`,
         },
       ],
     },
+    ...guidePages('es'),
   ],
 };
