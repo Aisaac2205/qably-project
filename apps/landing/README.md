@@ -38,6 +38,16 @@ Paragraphs, list items, table cells, callouts, FAQ questions and answers and sub
 
 A marker with no partner stays literal, a link with an empty label stays literal, and a target outside the two forms above (`javascript:`, `data:`, `http:`, a relative path, a URL with credentials) is rejected: only its label is shown. `lib/docs-links.test.ts` fails when a link written in markup points to a page or an anchor that does not exist, or has a rejected target. Code blocks, code-group labels, page titles and descriptions are plain text and never parsed. Subheading anchors and table-of-contents labels come from the words, so adding markup to a heading never moves its anchor.
 
+#### Writing docs text
+
+`content/content.test.ts` and `lib/docs-links.test.ts` enforce these conventions, so a change that breaks one fails the test run:
+
+- **Bold** marks what the reader must find or act on: a UI label or key term at its first mention, or a lead-in (`**Test results:** open the project...`). One or two spans per paragraph, never a whole sentence, never a heading.
+- **Code** marks anything copied verbatim: endpoints (`POST /runs/ingest`), fields (`externalId`), headers, variables, file names, flags and status codes. A code block keeps its lines flush left; indent only what the language needs.
+- **Links** go to a page or to a section id (`/docs/quickstart#step-4-report-ci`), written identically in both languages, never to a subheading, whose anchor comes from its words and differs per language. Link text says where the link leads, never "click here". Link a mention once, where the reader needs it.
+- **Callouts** are the exception: one per section at most, and only where a mistake is costly or surprising (the `if: always()` step, the two independent pipelines). Anything else is a paragraph or a list item, with a bold lead-in such as `**Note:**` when it needs one.
+- English and Spanish carry the same blocks in the same order, the same link targets and the same number of bold spans in every string.
+
 ### Docs UI language
 
 The reader is dark, monochrome and quiet: Geist, tokens from `src/styles/global.css` only, no hue anywhere in `components/` (`components/docs-components.test.ts` fails on a status or palette colour, a colour literal, an arbitrary Tailwind value, a string injected as HTML or a random id).

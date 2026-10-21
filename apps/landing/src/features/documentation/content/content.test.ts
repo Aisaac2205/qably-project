@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { walkBlocks } from '../lib/content-walk';
+import { forEachProse, walkBlocks } from '../lib/content-walk';
 import { validateDiagram } from '../lib/diagram';
-import { stripInline } from '../lib/inline';
+import { collectInlineLinks, parseInline, stripInline, type InlineNode } from '../lib/inline';
 import { getAllSections } from '../lib/pages';
 import { en } from './en';
 import { es } from './es';
@@ -442,4 +442,189 @@ describe('documentation content', () => {
       }
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// How the text is written: markup, callouts and code
+// ---------------------------------------------------------------------------
+
+/** Every prose string, keyed by where it lives, so two locales can be compared place by place. */
+function proseByPath(content: DocContent): Map<string, string> {
+  const seen = new Map<string, number>();
+  const prose = new Map<string, string>();
+
+  forEachProse(content, (text, where) => {
+    const index = seen.get(where) ?? 0;
+
+    seen.set(where, index + 1);
+    prose.set(`${where} #${index}`, text);
+  });
+
+  return prose;
+}
+
+function collectStrong(nodes: readonly InlineNode[], spans: string[]): void {
+  for (const node of nodes) {
+    if (node.type === 'strong') spans.push(stripInline(node.children.map(nodeText).join('')));
+    if (node.type === 'link') collectStrong(node.children, spans);
+  }
+}
+
+function nodeText(node: InlineNode): string {
+  if (node.type === 'text' || node.type === 'code') return node.value;
+
+  return node.children.map(nodeText).join('');
+}
+
+function strongSpans(text: string): string[] {
+  const spans: string[] = [];
+
+  collectStrong(parseInline(text), spans);
+
+  return spans;
+}
+
+/** The words of a string that are not inside a code span. */
+function textOutsideCode(text: string): string {
+  const parts: string[] = [];
+  const visit = (nodes: readonly InlineNode[]): void => {
+    for (const node of nodes) {
+      if (node.type === 'text') parts.push(node.value);
+      if (node.type === 'strong' || node.type === 'link') visit(node.children);
+    }
+  };
+
+  visit(parseInline(text));
+
+  return parts.join('');
+}
+
+function linkTargets(text: string): string[] {
+  return collectInlineLinks(text).map((href) => {
+    if (href.kind === 'external') return href.url;
+
+    const base = href.slug === null ? '/docs' : `/docs/${href.slug}`;
+
+    return href.anchor === null ? base : `${base}#${href.anchor}`;
+  });
+}
+
+function linkTargetsOfPage(content: DocContent, slug: string): string[] {
+  const page = content.pages.find((candidate) => candidate.slug === slug);
+  const targets: string[] = [];
+
+  forEachProse({ ...content, pages: page === undefined ? [] : [page] }, (text) => targets.push(...linkTargets(text)));
+
+  return targets;
+}
+
+function collectCodeStrings(content: DocContent): { where: string; label: string; code: string }[] {
+  return [...walkBlocks(content)].flatMap(({ block, where }) => {
+    if (block.type === 'code') return [{ where, label: 'code', code: block.code }];
+    if (block.type === 'codeGroup') {
+      return block.variants.map((variant) => ({ where, label: variant.label, code: variant.code }));
+    }
+
+    return [];
+  });
+}
+
+// Identifiers a reader copies: they are code in the prose, never plain words.
+const IDENTIFIERS_THAT_ARE_CODE: RegExp[] = [
+  /\b(?:POST|GET) \//,
+  /Authorization: Bearer/,
+  /\b(?:externalId|suiteId|suiteName|commitSha|QABLY_API_KEY|QABLY_API_BASE_URL)\b/,
+  /\bx-hub-signature-256\b/,
+  /\bjunit\.xml\b/,
+];
+
+describe('documentation text style', () => {
+  it.each(locales)('$name keeps a callout only as the exception: at most one per section', ({ content }) => {
+    for (const page of content.pages) {
+      for (const section of page.sections) {
+        const callouts = section.blocks.filter((block) => block.type === 'callout');
+
+        expect(callouts.length, `callouts in ${page.slug}#${section.id}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it.each(locales)('$name links the cross-references the page split had reworded as plain text', ({ content }) => {
+    expect(linkTargetsOfPage(content, 'other-runners')).toContain('/docs/quickstart#step-4-report-ci');
+    expect(linkTargetsOfPage(content, 'quickstart')).toContain('/docs/faq');
+    expect(linkTargetsOfPage(content, 'faq')).toContain('/docs/quickstart#step-2-connect-repository');
+  });
+
+  it.each(locales)('$name links the pages a reference page or the overview sends the reader to', ({ content }) => {
+    expect(linkTargetsOfPage(content, 'overview')).toEqual(
+      expect.arrayContaining(['/docs/quickstart', '/docs/api-keys', '/docs/api-ingest', '/docs/api-webhooks']),
+    );
+    expect(linkTargetsOfPage(content, 'other-runners')).toContain('/docs/api-ingest-junit');
+    expect(linkTargetsOfPage(content, 'api-ingest-junit')).toContain('/docs/api-ingest');
+    expect(linkTargetsOfPage(content, 'api-webhooks')).toContain('/docs/quickstart#step-2-connect-repository');
+    expect(linkTargetsOfPage(content, 'notifications')).toContain('/docs/api-webhooks');
+  });
+
+  it('en and es have the same prose in the same places, link the same targets and bold the same number of spans', () => {
+    const enProse = proseByPath(en);
+    const esProse = proseByPath(es);
+
+    expect([...esProse.keys()]).toEqual([...enProse.keys()]);
+
+    for (const [path, enText] of enProse) {
+      const esText = esProse.get(path)!;
+
+      expect(linkTargets(esText), `links at ${path}`).toEqual(linkTargets(enText));
+      expect(strongSpans(esText).length, `bold spans at ${path}`).toBe(strongSpans(enText).length);
+    }
+  });
+
+  it.each(locales)('$name uses bold for lead-ins and key terms: one or two spans, never a whole text or a heading', ({ content }) => {
+    forEachProse(content, (text, where) => {
+      const spans = strongSpans(text);
+
+      expect(spans.length, `bold spans at ${where}`).toBeLessThanOrEqual(2);
+
+      if (where.endsWith(' subheading') || where.endsWith(' table')) {
+        expect(spans, `bold at ${where}`).toEqual([]);
+      }
+
+      for (const span of spans) {
+        expect(span.length, `bold span "${span}" at ${where}`).toBeLessThan(stripInline(text).length);
+      }
+    });
+  });
+
+  it.each(locales)('$name writes endpoints, fields, headers and variables as code', ({ content }) => {
+    forEachProse(content, (text, where) => {
+      const outside = textOutsideCode(text);
+
+      for (const identifier of IDENTIFIERS_THAT_ARE_CODE) {
+        expect(outside, `${identifier} written as plain text at ${where}`).not.toMatch(identifier);
+      }
+    });
+  });
+
+  it.each(locales)('$name sets no code block with stray indentation', ({ content }) => {
+    for (const { where, label, code } of collectCodeStrings(content)) {
+      const lines = code.split('\n');
+      const rest = lines.slice(1).filter((line) => line.trim() !== '');
+
+      // A first line that is a complete statement is followed by statements at column 0.
+      const continues = /[\\{([=]$/.test(lines[0]!.trimEnd());
+
+      if (rest.length > 0 && !continues) {
+        expect(
+          rest.some((line) => !/^\s/.test(line)),
+          `every line after the first is indented in "${label}" at ${where}`,
+        ).toBe(true);
+      }
+
+      for (const line of rest) {
+        if (line.trimStart().startsWith('#')) {
+          expect(line, `comment line in "${label}" at ${where}`).toBe(line.trimStart());
+        }
+      }
+    }
+  });
 });

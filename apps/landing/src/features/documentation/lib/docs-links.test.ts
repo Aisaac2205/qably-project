@@ -5,6 +5,8 @@ import path from 'node:path';
 import { en } from '../content/en';
 import { es } from '../content/es';
 import type { DocContent } from '../content/types';
+import { forEachProse } from './content-walk';
+import { collectInlineLinks } from './inline';
 import { findBrokenInlineLinks } from './link-targets';
 import { docsPagePath } from './pages';
 import { buildPageToc } from './toc';
@@ -151,6 +153,30 @@ describe('links written as inline markup in the docs content', () => {
     { name: 'en', content: en },
   ])('every [label](/docs/...) in the $name content resolves to a page and an anchor', ({ content }) => {
     expect(findBrokenInlineLinks(content)).toEqual([]);
+  });
+
+  it.each([
+    { name: 'es', content: es },
+    { name: 'en', content: en },
+  ])('links written in the $name content target a page or a section, never a subheading', ({ content }) => {
+    // A subheading anchor is built from its words, which differ between languages;
+    // a section id is the same in both, so only that can be written once for both.
+    const sectionIds = new Map(
+      content.pages.map((page) => [page.slug, new Set(page.sections.map((section) => section.id))]),
+    );
+    const notSections: string[] = [];
+
+    forEachProse(content, (text, where) => {
+      for (const href of collectInlineLinks(text)) {
+        if (href.kind !== 'docs' || href.anchor === null) continue;
+
+        if (!sectionIds.get(href.slug ?? 'overview')?.has(href.anchor)) {
+          notSections.push(`#${href.anchor} (${where})`);
+        }
+      }
+    });
+
+    expect(notSections).toEqual([]);
   });
 
   it('would catch a broken link written in markup', () => {
