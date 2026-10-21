@@ -1095,6 +1095,7 @@ export class ExtractionProcessor {
           suiteId: true,
           name: true,
           documentationSource: true,
+          documentationQueuedAt: true,
           currentVersion: {
             select: {
               title: true,
@@ -1121,6 +1122,7 @@ export class ExtractionProcessor {
         }),
       );
 
+      let skippedForSupersededRun = 0;
       let skippedForHumanEdit = 0;
       let skippedForPendingProposal = 0;
       let skippedForIdenticalRedelivery = 0;
@@ -1131,6 +1133,17 @@ export class ExtractionProcessor {
         if (info === undefined) continue;
 
         suiteIds.add(info.suiteId);
+
+        // The queued marker is this run's claim on the case. Whoever cleared
+        // it since the job was queued owns the outcome now: an approval that
+        // published its own version, or this job's own earlier attempt that
+        // already committed. Nothing is written, so their outcome stands.
+        // Queuing the case again sets the marker, so a deliberate re-run
+        // still documents it.
+        if (info.documentationQueuedAt === null) {
+          skippedForSupersededRun += 1;
+          continue;
+        }
 
         if (info.documentationSource === HUMAN_DOCUMENTATION_SOURCE) {
           const humanSkipState: DocumentationStateWrite = {
@@ -1224,6 +1237,12 @@ export class ExtractionProcessor {
             status: 'in_review',
           },
         });
+      }
+
+      if (skippedForSupersededRun > 0) {
+        this.logger.log(
+          `Skipped documenting ${skippedForSupersededRun} case(s) in ${ctx.filePath}: superseded, their documentation run is no longer queued`,
+        );
       }
 
       if (skippedForHumanEdit > 0) {

@@ -174,6 +174,8 @@ The check only applies when the approval updates an existing case, the proposal'
 
 **Before deciding.** `GET /review/proposals/:id` also returns `matchedCase.documentation` (`queuedAt`, `outcomeAt`) for the case the proposal would update. While a documentation run is queued with no later outcome, the inspector shows `CaseDocumentingNotice` (`reviewInbox.caseDocumentingNotice`): Aeris is documenting this case, approving may conflict with its result, wait and compare again. It is a `role="note"` with a Phosphor icon and the AI accent tokens, and only shows on a proposal still in review.
 
+**Approving while a documentation run is queued.** The approval wins. Publishing clears the case's `documentationQueuedAt`, which is the queued run's claim on the case, and the document-file job checks that claim under the case lock: it skips a case whose marker is gone without writing anything, so the approved version and its documentation outcome stay. The run documents the case only if someone queues it again after the approval (see "A run only writes the cases it still owns" in `docs/AI_EXTRACTION.md`). The other order, the run publishing first, is the `stale-proposal` case above.
+
 **What the reviewer sees.** `aiReview.decisionStaleProposal` names the proposal and says the case got a newer version from Aeris or a teammate. Like the other approval conflicts, the proposal goes back into the queue and the inspector, and the lists refetch, so the comparison now shows the new version. Approving again sends the new base and goes through.
 
 ## Follow-ups

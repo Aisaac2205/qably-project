@@ -49,12 +49,16 @@ const extracted = [
   extractedCase('Cart > removes an item', 'Removes an item'),
 ];
 
+const QUEUED_AT = new Date('2026-10-20T08:00:00.000Z');
+
+/** A target case as the job reads it under the lock: queued for this run. */
 function caseRow(id: string, overrides: Record<string, unknown> = {}) {
   return {
     id,
     suiteId: 'suite-1',
     name: `Old ${id}`,
     documentationSource: 'ingestion',
+    documentationQueuedAt: QUEUED_AT as Date | null,
     currentVersion: null,
     ...overrides,
   };
@@ -170,11 +174,13 @@ function build(
     reclassifier as never,
   );
 
-  jest.spyOn(processor['logger'], 'log').mockImplementation(() => undefined);
+  const log = jest
+    .spyOn(processor['logger'], 'log')
+    .mockImplementation(() => undefined);
   jest.spyOn(processor['logger'], 'warn').mockImplementation(() => undefined);
   jest.spyOn(processor['logger'], 'error').mockImplementation(() => undefined);
 
-  return { processor, entitlement, reclassifier };
+  return { processor, entitlement, reclassifier, extractor, log };
 }
 
 function documentFileJob(attempt = { attemptsStarted: 1, attempts: 3 }) {
@@ -292,6 +298,78 @@ describe('ExtractionProcessor — document-file lock order', () => {
     expect(tx.$executeRawUnsafe).not.toHaveBeenCalled();
     expect(tx.testCase.findMany).not.toHaveBeenCalled();
     expect(tx.testCaseVersion.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExtractionProcessor — a run only writes the cases it still owns', () => {
+  const documented = extracted[0];
+
+  it('reads the queued marker of each case under the lock', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await processor.process(documentFileJob());
+
+    const [read] = tx.testCase.findMany.mock.calls as [
+      { select: Record<string, unknown> },
+    ][];
+    expect(read[0].select).toMatchObject({ documentationQueuedAt: true });
+  });
+
+  it('leaves alone a case an approval published after the job was queued, keeping the approval outcome', async () => {
+    // The approval cleared the marker and published its own version.
+    const tx = createTx([
+      caseRow('case-1', {
+        documentationQueuedAt: null,
+        currentVersion: { ...documented, title: 'Approved by a reviewer' },
+      }),
+      caseRow('case-2'),
+    ]);
+    const prisma = createPrisma(tx);
+    const { processor, log } = build(prisma);
+
+    await processor.process(documentFileJob());
+
+    expect(publishedCaseIds(tx)).toEqual(['case-2']);
+    expect(caseWrite(tx, 'case-1')).toBeUndefined();
+    expect(tx.extractedProposal.deleteMany).not.toHaveBeenCalledWith({
+      where: expect.objectContaining({ targetTestCaseId: 'case-1' }) as unknown,
+    });
+    expect(log).toHaveBeenCalledWith(
+      `Skipped documenting 1 case(s) in ${FILE_PATH}: superseded, their documentation run is no longer queued`,
+    );
+  });
+
+  it('documents a case again once someone queued a new run after the approval', async () => {
+    const tx = createTx([
+      caseRow('case-1', {
+        currentVersion: { ...documented, title: 'Approved by a reviewer' },
+      }),
+      caseRow('case-2'),
+    ]);
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await processor.process(documentFileJob());
+
+    expect(publishedCaseIds(tx)).toEqual(['case-1', 'case-2']);
+  });
+
+  it('publishes nothing when a retried job finds its first attempt already committed', async () => {
+    const tx = createTx([
+      caseRow('case-1', { documentationQueuedAt: null }),
+      caseRow('case-2', { documentationQueuedAt: null }),
+    ]);
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await processor.process(
+      documentFileJob({ attemptsStarted: 2, attempts: 3 }),
+    );
+
+    expect(publishedCaseIds(tx)).toEqual([]);
+    expect(tx.testCase.update).not.toHaveBeenCalled();
   });
 });
 

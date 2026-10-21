@@ -479,7 +479,15 @@ Writing the documentation is one transaction (`ExtractionProcessor.writeDocument
 
 The order is the one every writer of a case follows: organization row first, then `test_case` rows. A push that persists proposals (`ExtractedProposalWriter.persistExtracted`) spends its credit first too, then touches the cases through the proposals' foreign keys, so the two serialize on the organization row instead of deadlocking. Approving a proposal spends no credit and locks its case before anything else (see `docs/REVIEW_APPROVAL_CONFLICTS.md`).
 
-Reading after the lock is what makes the decisions below it sound. A chunk redelivered after the worker lock expires waits for the original to commit and then sees the version it published, so `isSameDocumentation` skips the case instead of publishing the same documentation twice. A person who edits a case while the job waits for the lock is seen too: the `human-documented` skip reads the committed `documentationSource`, not a value read before the wait.
+Reading after the lock is what makes the decisions below it sound. A person who edits a case while the job waits for the lock is seen: the `human-documented` skip reads the committed `documentationSource`, not a value read before the wait.
+
+**A run only writes the cases it still owns.** `enqueueDocumentFiles` sets `documentationQueuedAt` on every target before it enqueues the job, and that marker is the run's claim on the case. Every outcome clears it: this job's own write, a failure, or approving a proposal for the case, which publishes the reviewer's version. The job reads the marker under the lock, and a case whose marker is gone is skipped without writing anything, counted and logged as `superseded`. So:
+
+- **An approval wins over a run queued before it.** The approval's version and its `documentationOutcome` stay; Aeris does not publish over them.
+- **A retry never publishes twice.** A job retried after an attempt that already committed finds its markers cleared and writes nothing.
+- **A deliberate re-run still works.** Pressing **Document** again sets the marker again, so the next run owns the case.
+
+A chunk redelivered while its original is still running waits for the lock and then finds the markers cleared the same way. `isSameDocumentation` still skips a case the run owns whose current version already carries the same documentation, clearing its marker without a new version.
 
 The `already-pending` rule is checked twice. `enqueueDocumentFiles` and `enqueueDocumentCase` leave out a case that a proposal waiting for review targets (`targetTestCaseId`) or was matched to as a possible duplicate (`matchedCaseId`), the same rule the suite uses for its "In review" chip (`pendingProposalsWhere`, `apps/api/src/modules/review/lib/pending-proposals.ts`). A push or a document-case job can still create such a proposal while the document-file job waits in the queue, so the job checks again inside its transaction, after the lock, and skips the case with `documentationOutcome: 'skipped'` and the reason `already-pending` instead of publishing over the version the reviewer is about to compare against. A manual-review fallback proposal does not count in either check: documenting the case replaces it.
 
