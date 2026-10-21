@@ -208,8 +208,45 @@ describe('ReviewInboxQueryService.findOne', () => {
         name: 'Empties the cart',
         suiteId: 'suite-1',
         suiteName: 'Cart suite',
+        documentation: { queuedAt: null, outcomeAt: null },
       });
     }
+  });
+
+  it('tells the inspector when Aeris is documenting the case the proposal would update', async () => {
+    const prisma = createPrisma();
+    const queuedAt = new Date('2026-10-20T09:00:00.000Z');
+    const outcomeAt = new Date('2026-10-19T09:00:00.000Z');
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-target',
+      targetTestCase: {
+        id: 'case-target',
+        name: 'Empties the cart',
+        suiteId: 'suite-1',
+        suite: { name: 'Cart suite' },
+        currentVersion: null,
+        documentationQueuedAt: queuedAt,
+        documentationOutcomeAt: outcomeAt,
+      },
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.matchedCase?.documentation).toEqual({
+        queuedAt: queuedAt.toISOString(),
+        outcomeAt: outcomeAt.toISOString(),
+      });
+    }
+    const [call] = prisma.extractedProposal.findFirst.mock.calls as [
+      [{ select: { targetTestCase: { select: Record<string, unknown> } } }],
+    ];
+    expect(call[0].select.targetTestCase.select).toMatchObject({
+      documentationQueuedAt: true,
+      documentationOutcomeAt: true,
+    });
   });
 
   it('falls back to the duplicate-classification match for matchedCase when there is no explicit target', async () => {
@@ -236,6 +273,7 @@ describe('ReviewInboxQueryService.findOne', () => {
         name: 'A different case',
         suiteId: 'suite-2',
         suiteName: 'Checkout suite',
+        documentation: { queuedAt: null, outcomeAt: null },
       });
     }
   });
@@ -295,6 +333,7 @@ describe('ReviewInboxQueryService.findOne', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.publishedVersion).toEqual({
+        id: 'version-2',
         version: 2,
         title: 'Empties the cart',
         objective: 'Confirm the cart resets',

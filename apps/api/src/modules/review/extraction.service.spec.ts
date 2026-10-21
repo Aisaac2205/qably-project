@@ -624,12 +624,35 @@ describe('ExtractionService.enqueueDocumentCase', () => {
     expect(queue.add).not.toHaveBeenCalled();
     expect(prisma.extractedProposal.findFirst).toHaveBeenCalledWith({
       where: {
-        targetTestCaseId: 'case-1',
         status: 'in_review',
         needsManualReview: false,
+        OR: [{ targetTestCaseId: 'case-1' }, { matchedCaseId: 'case-1' }],
       },
       select: { id: true },
     });
+  });
+
+  it('returns already-pending when a possible duplicate in review was matched to the case', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockImplementation(
+      (args: { where: { OR?: Record<string, unknown>[] } }) =>
+        Promise.resolve(
+          args.where.OR?.some((branch) => branch.matchedCaseId === 'case-1')
+            ? { id: 'possible-duplicate' }
+            : null,
+        ),
+    );
+
+    const result = await build(prisma, queue).enqueueDocumentCase(
+      org,
+      'suite-1',
+      'case-1',
+      null,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'already-pending' });
+    expect(queue.add).not.toHaveBeenCalled();
   });
 
   it('does not let a manual-review fallback proposal block re-enqueuing the case', async () => {
@@ -919,12 +942,40 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
     expect(queue.addBulk).not.toHaveBeenCalled();
     expect(prisma.extractedProposal.findMany).toHaveBeenCalledWith({
       where: {
-        targetTestCaseId: { in: ['case-1'] },
         status: 'in_review',
         needsManualReview: false,
+        OR: [
+          { targetTestCaseId: { in: ['case-1'] } },
+          { matchedCaseId: { in: ['case-1'] } },
+        ],
       },
-      select: { targetTestCaseId: true },
+      select: { targetTestCaseId: true, matchedCaseId: true },
     });
+  });
+
+  it('skips a case a possible duplicate in review was matched to, as the suite shows it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: null, matchedCaseId: 'case-1' },
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'already-pending', count: 1 }],
+      },
+    });
+    expect(queue.addBulk).not.toHaveBeenCalled();
   });
 
   it('does not let a manual-review fallback proposal keep a case out of the documentable set', async () => {

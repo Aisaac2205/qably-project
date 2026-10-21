@@ -26,6 +26,10 @@ export function CaseActionsMenu({
 }: CaseActionsMenuProps) {
   const { t } = useTranslation()
   const documentCase = useDocumentCase()
+  // A proposal waiting for review is the documentation in flight: approving or
+  // rejecting it comes first, and the server would refuse a new run anyway.
+  const canRedocument =
+    testCase.executionMode === 'automated' && testCase.pendingProposalId == null
 
   return (
     <Menu>
@@ -42,7 +46,7 @@ export function CaseActionsMenu({
               <PencilSimple size={14} aria-hidden="true" />
               {t('suites.editCase')}
             </MenuItem>
-            {testCase.executionMode === 'automated' && (
+            {canRedocument && (
               <MenuItem
                 onClick={() =>
                   documentCase.mutate({ suiteId: testCase.suiteId, caseId: testCase.id })

@@ -20,6 +20,11 @@ import { buildJobId } from '../../common/queue/job-id';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { TestFileLocator } from '../repository/test-file-locator';
 import type { DocumentationStateWrite } from './lib/publish-test-case-version';
+import {
+  PENDING_PROPOSAL_CASES_SELECT,
+  casesWithPendingProposal,
+  pendingProposalsWhere,
+} from './lib/pending-proposals';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import {
   locateAndPersistAutomationFilePath,
@@ -307,11 +312,12 @@ export class ExtractionService {
     if (testCase === null) return err('not-found');
     if (testCase.executionMode !== 'automated') return err('not-automated');
 
+    // A possible duplicate matched to the case counts too, as the suite shows.
     const pending = await this.prisma.extractedProposal.findFirst({
       where: {
-        targetTestCaseId: caseId,
         status: PENDING_STATUS,
         needsManualReview: false,
+        OR: [{ targetTestCaseId: caseId }, { matchedCaseId: caseId }],
       },
       select: { id: true },
     });
@@ -422,18 +428,11 @@ export class ExtractionService {
       },
     });
 
-    const pendingRows = await this.prisma.extractedProposal.findMany({
-      where: {
-        targetTestCaseId: { in: rows.map((row) => row.id) },
-        status: PENDING_STATUS,
-        needsManualReview: false,
-      },
-      select: { targetTestCaseId: true },
-    });
-    const pendingIds = new Set(
-      pendingRows
-        .map((row) => row.targetTestCaseId)
-        .filter((id): id is string => id !== null),
+    const pendingIds = casesWithPendingProposal(
+      await this.prisma.extractedProposal.findMany({
+        where: pendingProposalsWhere(rows.map((row) => row.id)),
+        select: PENDING_PROPOSAL_CASES_SELECT,
+      }),
     );
 
     const skippedIds = emptySkippedIds();

@@ -17,13 +17,22 @@ import type {
   RejectionView,
   ReviewError,
 } from './review.contracts';
+import { lockTestCaseForUpdate } from './lib/lock-test-case';
 import { publishTestCaseVersion } from './lib/publish-test-case-version';
+import { retryTransientConflicts } from './lib/transient-transaction-conflict';
 
 const PENDING_STATUS = 'in_review';
+const APPROVAL_ATTEMPTS = 2;
 
 class DecisionConflict extends Error {
   constructor() {
     super('proposal is no longer in_review');
+  }
+}
+
+class StaleProposal extends Error {
+  constructor() {
+    super('the case moved past the version this proposal was reviewed against');
   }
 }
 
@@ -199,7 +208,12 @@ export class ReviewDecisionService {
     let approval: ApprovalView;
 
     try {
-      approval = await this.publish(proposal.value, suiteId, input);
+      // A deadlock or serialization failure rolled the transaction back
+      // whole, so it runs once more before the reviewer sees an error.
+      approval = await retryTransientConflicts(
+        () => this.publish(proposal.value, suiteId, input),
+        { attempts: APPROVAL_ATTEMPTS },
+      );
     } catch (error) {
       if (isUniqueViolation(error)) {
         return err(
@@ -207,6 +221,7 @@ export class ReviewDecisionService {
         );
       }
       if (error instanceof DecisionConflict) return err('invalid-transition');
+      if (error instanceof StaleProposal) return err('stale-proposal');
       throw error;
     }
 
@@ -332,12 +347,39 @@ export class ReviewDecisionService {
   private publish(
     proposal: ProposalRow,
     suiteId: string | null,
-    input: DecisionInput,
+    input: ApprovalInput,
   ): Promise<ApprovalView> {
     return this.prisma.$transaction(async (tx) => {
+      // The case lock comes first, before the claim: a document-file job
+      // holds the same lock while it deletes proposals of that case, so
+      // claiming first could deadlock against it. Approval spends no credit,
+      // so there is no organization row to lock ahead of it.
+      const superseded =
+        proposal.targetTestCaseId === null
+          ? null
+          : await lockTestCaseForUpdate(tx, proposal.targetTestCaseId);
+
+      // Checked under the lock, so no writer can publish between the check
+      // and this approval's own version. A request without a base (a legacy
+      // caller, or a reviewer who never saw the comparison) skips the check.
+      if (
+        superseded !== null &&
+        input.baseVersionId !== undefined &&
+        superseded.currentVersionId !== input.baseVersionId
+      ) {
+        throw new StaleProposal();
+      }
+
+      // The version this approval replaces, kept on the proposal.
       const claim = await tx.extractedProposal.updateMany({
         where: { id: proposal.id, status: PENDING_STATUS },
-        data: { status: 'approved' },
+        data:
+          superseded === null
+            ? { status: 'approved' }
+            : {
+                status: 'approved',
+                supersededVersionId: superseded.currentVersionId,
+              },
       });
       if (claim.count === 0) throw new DecisionConflict();
 

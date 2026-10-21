@@ -15,19 +15,22 @@ Approving a proposal can fail because the official case it would create or updat
 
 Approval runs in one transaction (`ReviewDecisionService.publish`, `apps/api/src/modules/review/review-decision.service.ts`):
 
-1. Claim the proposal: `in_review` to `approved`.
-2. With no `targetTestCaseId`, create a `TestCase` with `name = proposal.title` and, when the proposal has an `automationKey`, `automationKey = proposal.automationKey`.
-3. With a target, publish a new version and rewrite the target's `name`. The flow rewrites the target's `automationKey` only when the proposal carries one; a proposal without an `automationKey` leaves the target's key untouched.
+1. With a target, lock its `test_case` row (`SELECT ... FOR NO KEY UPDATE`, `lockTestCaseForUpdate` in `apps/api/src/modules/review/lib/lock-test-case.ts`). The lock comes before the claim and before the versions are counted, so two writers of the same case publish one after the other: version n+1 is computed by one writer at a time. A document-file job takes the same lock, after spending its credit; approval spends none, so it has no organization row to lock first. The mode is `FOR NO KEY UPDATE` rather than `FOR UPDATE` because a reclassify updates a proposal of this case and then needs a foreign-key share lock on the case: `FOR UPDATE` blocks that share lock, so the reclassify (holding the proposal) and the approval (holding the case, waiting to claim the proposal) would deadlock.
+2. Claim the proposal: `in_review` to `approved`.
+3. With no `targetTestCaseId`, create a `TestCase` with `name = proposal.title` and, when the proposal has an `automationKey`, `automationKey = proposal.automationKey`.
+4. With a target, publish a new version and rewrite the target's `name`. The flow rewrites the target's `automationKey` only when the proposal carries one; a proposal without an `automationKey` leaves the target's key untouched.
 
-Steps 2 and 3 can break these constraints (`apps/api/prisma/schema.prisma`, model `TestCase`):
+Steps 3 and 4 can break these constraints (`apps/api/prisma/schema.prisma`, model `TestCase`):
 
 | Constraint | Postgres index | Code |
 |---|---|---|
 | `@@unique([suiteId, name])` | `test_case_suiteId_name_key` | `name-taken` |
 | `@@unique([suiteId, automationKey])` | `test_case_suiteId_automationKey_key` | `automation-key-taken` |
-| Any other unique index, for example `test_case_version_testCaseId_version_key` when two approvals publish to the same case at once | varies | `publish-conflict` |
+| Any other unique index, for example `test_case_version_testCaseId_version_key` if a writer publishes a version without taking the case lock | varies | `publish-conflict` |
 
 When a constraint fails, the transaction rolls back, so the proposal stays `in_review`. Retrying the same approval fails the same way until the data changes.
+
+A transaction that Postgres aborts as a deadlock victim or a serialization failure is different: it rolled back whole and would succeed on a second try. `ReviewDecisionService.approve` runs it once more (`retryTransientConflicts`, `apps/api/src/modules/review/lib/transient-transaction-conflict.ts`) before the error reaches the reviewer.
 
 ## How the API tells the constraints apart
 
@@ -83,6 +86,7 @@ The test fixture `apps/api/test/support/prisma-unique-violation.ts` builds this 
 | `name-taken` | Another official case in this suite already uses that title | The case in the same suite whose `name` equals the proposal title |
 | `automation-key-taken` | Another official case in this suite already runs as that automated test | The case in the same suite whose `automationKey` equals the proposal's |
 | `publish-conflict` | Publishing collided with another change to the official cases. Try again | Always `null` |
+| `stale-proposal` | The case has a newer published version than the one this proposal was reviewed against | Not sent (see "Approving over a newer version") |
 
 - **Organization scope.** The lookup filters on `project.organizationId` of the caller, so a case from another organization is never returned. When nothing matches, `conflictingCase` is `null`.
 - **Update path.** When the proposal targets an existing case, the lookup runs in that case's suite and excludes the target itself. No reclassify is queued on this path, even for `automation-key-taken`.
@@ -132,7 +136,7 @@ Conflicting case lookup failed: proposal=<proposalId> suite=<suiteId>
 | The target case is renamed to a title another case in the suite already uses | name | Yes | Possible |
 | An official case gets the same `automationKey` after the proposal was written (ingestion or another approval) | automationKey | No: ingestion and approval both reclassify the suite (approval through the `proposal.approved` event, see `DOMAIN_EVENTS.md`), which sets the target | Unlikely to persist |
 | The proposal has no `suiteId`, so approval falls back to the default suite, which the reclassifier never visits | automationKey | Yes | Edge case |
-| Two approvals publish a version to the same case at the same time | other (`publish-conflict`) | No | Race |
+| Two writers (approvals, document-file jobs) publish a version to the same case at the same time | other (`publish-conflict`) | No | Prevented: both take the case lock before counting versions, so the second waits and publishes the next number |
 
 Which constraint fired for the production reports of September 2026 is unverified. The new log line answers it the next time a reviewer hits the conflict.
 
@@ -148,6 +152,35 @@ The web client (`apps/web/src/features/review-inbox`) turns each conflict into a
 - **Unmounted page.** A failure that arrives after the page unmounted does not touch history, selection or focus.
 - **Error list cap.** At most three alerts show, newest last. Older ones collapse into one line, "And N more errors", whose **Clear** control removes only the hidden ones. Identical messages merge into one alert with "Happened N times", and dismissing it removes every occurrence. The list scrolls past a maximum height, so it cannot push the queue out of view.
 
+## Approving over a newer version (`stale-proposal`)
+
+A proposal for an existing case is reviewed against the case's published version, which the inspector shows as "Changes from published version N". The case can get a newer version while the proposal waits: a document-file job (the suite's **Document** action) or another approval publishes one. Approving would then publish over a version the reviewer never compared against, and the last writer would win without anyone noticing.
+
+A person editing the case in the suite is not one of them. `SuiteCasesService.updateCase` (`apps/api/src/modules/suites/suite-cases.service.ts`) writes the case fields, and marks the documentation `human` when a documented field changed, but publishes no version, so `currentVersionId` does not move and this check cannot see the edit: approving still overwrites it. This is a known limitation, listed under "Follow-ups".
+
+The approval carries the version the reviewer saw, and the API refuses when the case has moved past it:
+
+1. `GET /review/proposals/:id` returns `publishedVersion.id`.
+2. The web client sends it back as `baseVersionId` on `POST /review/proposals/:id/approve` (`useProposalDecision`, read from the cached proposal detail). It sends `null` when the inspector showed no published version, and leaves the field out when the detail never loaded.
+3. Inside the approval transaction, after locking the case row, `ReviewDecisionService.publish` compares the case's `currentVersionId` with that base. A mismatch rolls back with `409 stale-proposal`: nothing is claimed or published, and the proposal stays `in_review`.
+4. A successful approval records the version it replaced in `ExtractedProposal.supersededVersionId` (migration `20261021150000_add_proposal_base_version`). That column is written only on approval and is never read back as a base.
+
+| Request `baseVersionId` | Check |
+|---|---|
+| A version id | The case must still be at that version |
+| `null` | The case must still have no published version |
+| left out (a legacy caller, or a detail that never loaded) | Skipped |
+
+The check only applies when the approval updates an existing case, the proposal's target or the matched case of `applyTo: 'matched-case'`. A new case has no version to be stale against.
+
+**Why the base comes from the request.** Proposals for existing cases are written by `ExtractedProposalWriter`, and recording the base when the proposal is created would mean changing that writer. The request variant needs no writer change and checks what matters: the version the reviewer actually compared against, including a refetch of the detail after they opened it.
+
+**Before deciding.** `GET /review/proposals/:id` also returns `matchedCase.documentation` (`queuedAt`, `outcomeAt`) for the case the proposal would update. While a documentation run is queued with no later outcome, the inspector shows `CaseDocumentingNotice` (`reviewInbox.caseDocumentingNotice`): Aeris is documenting this case, and approving now wins, so Aeris skips the case. It is a `role="note"` with a Phosphor icon and the AI accent tokens, and only shows on a proposal still in review. While it shows, `useProposal` refetches the detail every 3 seconds (`caseDocumentingRefetchInterval`, `apps/web/src/features/review-inbox/lib/case-documenting.ts`), so the note clears and the comparison updates when the run finishes; the polling stops with it, and pauses in a background tab.
+
+**Approving while a documentation run is queued.** The approval wins. Publishing clears the case's `documentationQueuedAt`, which is the queued run's claim on the case, and the document-file job checks that claim under the case lock: it skips a case whose marker is gone without writing anything, so the approved version and its documentation outcome stay. The run documents the case only if someone queues it again after the approval (see "A run only writes the cases it still owns" in `docs/AI_EXTRACTION.md`). The other order, the run publishing first, is the `stale-proposal` case above.
+
+**What the reviewer sees.** `aiReview.decisionStaleProposal` names the proposal and says the case got a newer version from Aeris or a teammate (another approval). Like the other approval conflicts, the proposal goes back into the queue and the inspector, and the lists refetch, so the comparison now shows the new version. Approving again sends the new base and goes through.
+
 ## Follow-ups
 
 The API slice only makes the 409 precise. The web now shows each conflict; the paths that resolve one are not built.
@@ -160,3 +193,4 @@ The API slice only makes the 409 precise. The web now shows each conflict; the p
 | API and web | Give reviewers a way out of `name-taken` besides rejecting: an optional title override on approve, validated like extraction titles (1 to 120 characters) | Proposed: `POST /review/proposals/:id/approve` body `{ comment?: string, title?: string }` | Not implemented. The approve body accepts no `title` today |
 | API and web | Let the reviewer resolve `name-taken` or `automation-key-taken` by publishing the proposal as a new version of `conflictingCase`, as an explicit human choice made after seeing that case | Not designed | Not implemented |
 | API | Include proposals with a null `suiteId` in reclassification, or backfill their suite | None | Not implemented |
+| API | Let the `stale-proposal` check see a person's edit: today `SuiteCasesService.updateCase` publishes no version, so approving a proposal overwrites a manual edit made after the reviewer opened it. Either publish a version on a documented-field edit, or compare a case edit timestamp as well | Not designed | Known limitation, not implemented |

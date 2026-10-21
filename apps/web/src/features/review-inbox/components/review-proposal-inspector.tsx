@@ -4,6 +4,7 @@ import type { RefObject } from 'react'
 import type { ExtractedProposal } from '@qably/types'
 import { DuplicateComparison } from './duplicate-comparison'
 import { InspectorHeader } from './inspector/inspector-header'
+import { CaseDocumentingNotice } from './inspector/case-documenting-notice'
 import { ManualReviewNotice } from './inspector/manual-review-notice'
 import { ProposalContentSections } from './inspector/proposal-content-sections'
 import { InspectorEvidence } from './inspector/inspector-evidence'
@@ -12,6 +13,7 @@ import { DecisionToolbar } from './inspector/decision-toolbar'
 import type { ApplyTarget, InboxSuite, ProposalClassification } from '../api/review.api'
 import { matchedCaseHref, resolveClassification } from '../lib/classification-reason'
 import { useProject } from '@/features/projects/hooks/use-project'
+import { isCaseBeingDocumented } from '../lib/case-documenting'
 import { useProposal } from '../hooks/use-proposals'
 
 interface ReviewProposalInspectorProps {
@@ -39,6 +41,7 @@ export function ReviewProposalInspector({
 
   const needsManualReview = proposal.needsManualReview || proposal.steps.length === 0
   const classification = resolveClassification(proposal.classification)
+  const showDocumentingNotice = isCaseBeingDocumented(detail)
 
   const formattedDate = proposal.createdAt
     ? new Date(proposal.createdAt).toLocaleDateString(undefined, {
@@ -66,6 +69,8 @@ export function ReviewProposalInspector({
             caseHref={matchedCaseHref(proposal.projectId, classification)}
           />
         )}
+
+        {showDocumentingNotice && <CaseDocumentingNotice />}
 
         {needsManualReview && <ManualReviewNotice proposal={proposal} />}
 

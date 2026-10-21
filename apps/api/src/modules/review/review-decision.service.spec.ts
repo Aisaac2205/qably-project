@@ -63,6 +63,7 @@ interface FakePrisma {
   reviewDecision: { create: jest.Mock; findFirst: jest.Mock };
   traceabilityLink: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
+  $queryRawUnsafe: jest.Mock;
 }
 
 function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
@@ -94,6 +95,9 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
     },
     $transaction: jest.fn(),
+    $queryRawUnsafe: jest
+      .fn()
+      .mockResolvedValue([{ currentVersionId: 'version-current' }]),
   };
 
   prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
@@ -1454,5 +1458,199 @@ describe('ReviewDecisionService.lastDecision', () => {
     await expect(build(prisma).lastDecision(org, 'proposal-1')).rejects.toThrow(
       'Unexpected review decision action: changes_requested',
     );
+  });
+});
+
+describe('ReviewDecisionService.approve case lock', () => {
+  // FOR NO KEY UPDATE: a reclassify that updates a proposal of this case
+  // takes a foreign-key share lock on it, which FOR UPDATE would block while
+  // this approval waits for that proposal: a deadlock cycle.
+  const LOCK_SQL = /FROM "test_case" WHERE id = \$1 FOR NO KEY UPDATE$/;
+
+  function lockCalls(prisma: FakePrisma): [string, string][] {
+    return (prisma.$queryRawUnsafe.mock.calls as [string, string][]).filter(
+      ([sql]) => LOCK_SQL.test(sql),
+    );
+  }
+
+  it('locks the target case row before it claims the proposal and counts the versions', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(lockCalls(prisma)).toEqual([[expect.any(String), 'case-existing']]);
+    const [lockOrder] = prisma.$queryRawUnsafe.mock.invocationCallOrder;
+    const [claimOrder] =
+      prisma.extractedProposal.updateMany.mock.invocationCallOrder;
+    const [countOrder] = prisma.testCaseVersion.count.mock.invocationCallOrder;
+    expect(lockOrder).toBeLessThan(claimOrder);
+    expect(lockOrder).toBeLessThan(countOrder);
+  });
+
+  it('locks the matched case when a possible duplicate is applied to it', async () => {
+    const prisma = createPrisma({
+      duplicateKind: 'possible_duplicate',
+      matchedCaseId: 'case-matched',
+      matchedCase: {
+        id: 'case-matched',
+        projectId: 'project-1',
+        suiteId: 'suite-1',
+        automationFilePath: null,
+      },
+    });
+
+    await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'matched-case',
+    });
+
+    expect(lockCalls(prisma)).toEqual([[expect.any(String), 'case-matched']]);
+  });
+
+  it('takes no case lock when the approval creates a new case', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  function deadlock(): Error {
+    return Object.assign(new Error('deadlock detected'), {
+      name: 'DriverAdapterError',
+      cause: { kind: 'postgres', code: '40P01', originalCode: '40P01' },
+    });
+  }
+
+  it('runs the approval once more when its transaction loses a deadlock', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    const run = prisma.$transaction.getMockImplementation() as (
+      callback: (tx: FakePrisma) => unknown,
+    ) => unknown;
+    prisma.$transaction
+      .mockImplementationOnce(() => Promise.reject(deadlock()))
+      .mockImplementation(run);
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after a second conflict instead of retrying forever', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    prisma.$transaction.mockImplementation(() => Promise.reject(deadlock()));
+
+    await expect(
+      build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' }),
+    ).rejects.toThrow('deadlock detected');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry an error that is not a transaction conflict', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    prisma.$transaction.mockImplementation(() =>
+      Promise.reject(new Error('boom')),
+    );
+
+    await expect(
+      build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' }),
+    ).rejects.toThrow('boom');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReviewDecisionService.approve stale proposal', () => {
+  function caseAt(prisma: FakePrisma, currentVersionId: string | null) {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ currentVersionId }]);
+  }
+
+  it('refuses to publish over a version newer than the one the reviewer saw', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-by-aeris');
+    const publish = jest.fn();
+
+    const result = await build(prisma, fakeEvents(publish)).approve(
+      org,
+      'proposal-1',
+      { actorId: 'user-1', baseVersionId: 'version-seen' },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'stale-proposal' });
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+    expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the reviewer saw no published version and the case has one since', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-by-aeris');
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      baseVersionId: null,
+    });
+
+    expect(result).toEqual({ ok: false, error: 'stale-proposal' });
+  });
+
+  it('publishes when the case is still at the version the reviewer saw, and records that version as superseded', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-seen');
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      baseVersionId: 'version-seen',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
+      data: { status: 'approved', supersededVersionId: 'version-seen' },
+    });
+  });
+
+  it('skips the check when the request carries no base, as a legacy caller does', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    caseAt(prisma, 'version-by-aeris');
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
+      data: { status: 'approved', supersededVersionId: 'version-by-aeris' },
+    });
+  });
+
+  it('reads no recorded base from the proposal itself', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    const [call] = prisma.extractedProposal.findFirst.mock.calls as [
+      [{ select: Record<string, unknown> }],
+    ];
+    expect(call[0].select).not.toHaveProperty('baseVersionId');
+    expect(call[0].select).not.toHaveProperty('supersededVersionId');
+  });
+
+  it('ignores the base when the approval creates a new case', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      baseVersionId: 'version-of-some-match',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
+      data: { status: 'approved' },
+    });
   });
 });

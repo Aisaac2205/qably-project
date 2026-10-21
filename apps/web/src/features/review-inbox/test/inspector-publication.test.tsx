@@ -15,6 +15,7 @@ const matchedCase: MatchedCaseView = {
   name: 'Empties the cart',
   suiteId: 'suite-1',
   suiteName: 'Checkout',
+  documentation: { queuedAt: null, outcomeAt: null },
 }
 
 const source: ProposalSourceView = {
@@ -36,6 +37,7 @@ const decision: LastDecisionView = {
 }
 
 const publishedVersion: PublishedVersionView = {
+  id: 'version-3',
   version: 3,
   title: 'Empties the cart',
   objective: 'Confirm the cart resets',

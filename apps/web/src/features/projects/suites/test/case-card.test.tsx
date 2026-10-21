@@ -353,6 +353,17 @@ describe('CaseCard', () => {
       expect(screen.queryByText('Document again with Aeris')).not.toBeInTheDocument()
     })
 
+    it('does not offer to document again while a proposal for the case waits for review', async () => {
+      const user = userEvent.setup()
+      const inReview: TestCase = { ...automatedCase, pendingProposalId: 'proposal-1' }
+      await act(async () => { renderWithQuery(<CaseCard testCase={inReview} onEdit={noop} onDelete={noop} />) })
+
+      await user.click(screen.getByRole('button', { name: 'Case actions' }))
+
+      expect(await screen.findByText('Edit case')).toBeInTheDocument()
+      expect(screen.queryByText('Document again with Aeris')).not.toBeInTheDocument()
+    })
+
     it('shows the AI-not-enabled message when re-documenting is refused for the organization', async () => {
       const user = userEvent.setup()
       vi.spyOn(suitesApi, 'documentCase').mockRejectedValueOnce(

@@ -24,6 +24,7 @@ function proposal(overrides: Partial<ExtractedProposal> = {}): ExtractedProposal
 
 function publishedVersion(overrides: Partial<PublishedVersionView> = {}): PublishedVersionView {
   return {
+    id: 'version-2',
     version: 2,
     title: 'Empties the cart',
     objective: 'Confirm the cart resets',

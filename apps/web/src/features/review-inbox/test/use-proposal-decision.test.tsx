@@ -228,6 +228,101 @@ describe('useProposalDecision', () => {
     })
   })
 
+  describe('the published version the reviewer saw', () => {
+    const publishedVersion: reviewApi.PublishedVersionView = {
+      id: 'version-4',
+      version: 4,
+      title: 'Empties the cart',
+      objective: 'Confirm the cart resets',
+      preconditions: [],
+      steps: ['Open the cart'],
+      expectedResult: 'The cart shows zero items',
+      publishedAt: '2026-10-20T10:00:00.000Z',
+      publishedBy: null,
+    }
+
+    function seedDetail(
+      client: QueryClient,
+      version: reviewApi.PublishedVersionView | null,
+    ) {
+      const detail: reviewApi.ProposalDetail = {
+        ...proposal('proposal-1'),
+        evidence: null,
+        links: [],
+        matchedCase: null,
+        publishedVersion: version,
+        source: null,
+        recentRuns: [],
+        decision: null,
+      }
+      client.setQueryData(reviewKeys.detail('proposal-1'), detail)
+    }
+
+    function approveWith(client: QueryClient) {
+      const approveSpy = vi.spyOn(reviewApi, 'approveProposal').mockResolvedValue(approvalResult)
+      const { result } = renderHook(
+        () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+        { wrapper: wrapperFor(client) },
+      )
+
+      act(() => {
+        result.current.approve('proposal-1')
+      })
+
+      return approveSpy
+    }
+
+    it('sends the id of the version the inspector compared against', async () => {
+      const client = makeClient()
+      seedDetail(client, publishedVersion)
+
+      const approveSpy = approveWith(client)
+
+      await waitFor(() => expect(approveSpy).toHaveBeenCalled())
+      expect(approveSpy.mock.calls[0][1]).toMatchObject({ baseVersionId: 'version-4' })
+    })
+
+    it('sends a null base when the inspector showed no published version', async () => {
+      const client = makeClient()
+      seedDetail(client, null)
+
+      const approveSpy = approveWith(client)
+
+      await waitFor(() => expect(approveSpy).toHaveBeenCalled())
+      expect(approveSpy.mock.calls[0][1]).toMatchObject({ baseVersionId: null })
+    })
+
+    it('sends no base when the detail never loaded, since the reviewer saw no comparison', async () => {
+      const client = makeClient()
+
+      const approveSpy = approveWith(client)
+
+      await waitFor(() => expect(approveSpy).toHaveBeenCalled())
+      expect(approveSpy.mock.calls[0][1]?.baseVersionId).toBeUndefined()
+    })
+
+    it('reports a stale proposal and puts the card back in the queue', async () => {
+      vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+        new ApiError(409, 'Conflict', 'stale-proposal'),
+      )
+      const client = makeClient()
+      seedInboxPage(client, 'proposal-1')
+      const onError = vi.fn()
+      const { result } = renderHook(
+        () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn(), onError }),
+        { wrapper: wrapperFor(client) },
+      )
+
+      act(() => {
+        result.current.approve('proposal-1')
+      })
+
+      await waitFor(() => expect(result.current.decisionError).toBe('stale-proposal'))
+      expect(onError).toHaveBeenCalledWith('stale-proposal', 'proposal-1', null, null)
+      expect(inboxData(client)?.pages[0].items.map((i) => i.id)).toEqual(['proposal-1'])
+    })
+  })
+
   it('invalidates suite and project data after a successful reject', async () => {
     vi.spyOn(reviewApi, 'rejectProposal').mockResolvedValue({ decisionId: 'decision-1' })
     const client = makeClient()

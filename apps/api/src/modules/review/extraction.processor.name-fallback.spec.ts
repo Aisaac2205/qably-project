@@ -113,6 +113,13 @@ function createPrisma(store: CaseNameStore) {
     $transaction: jest.fn(store.transaction),
   };
 
+  // The job reads its targets inside the transaction, once they are locked,
+  // and rechecks there that no proposal for them is waiting for review.
+  Object.assign(store.tx.testCase, { findMany: prisma.testCase.findMany });
+  Object.assign(store.tx.extractedProposal, {
+    findMany: jest.fn().mockResolvedValue([]),
+  });
+
   return prisma;
 }
 
@@ -146,6 +153,7 @@ function build(prisma: FakePrisma, extractor: TestCaseExtractor) {
       { publish: jest.fn() } as never,
     ),
     { GEMINI_MODEL: 'gemini-test' } as Env,
+    { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
   );
 
   const warn = jest

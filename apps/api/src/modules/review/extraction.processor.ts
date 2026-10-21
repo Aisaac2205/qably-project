@@ -45,6 +45,16 @@ import {
   type PublishTestCaseVersionFields,
 } from './lib/publish-test-case-version';
 import { publishWithNameFallback } from './lib/publish-with-name-fallback';
+import {
+  PENDING_PROPOSAL_CASES_SELECT,
+  casesWithPendingProposal,
+  pendingProposalsWhere,
+} from './lib/pending-proposals';
+import {
+  RetryableTransactionConflictError,
+  isTransientTransactionConflict,
+  retryTransientConflicts,
+} from './lib/transient-transaction-conflict';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { testCaseUniqueConstraint } from './lib/test-case-unique-constraint';
 import {
@@ -70,6 +80,7 @@ import {
 } from './extraction.types';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
+import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 
 const MAX_CASE_OBSERVATIONS = CASE_LIMITS.observations;
 const HEAD_REF = 'HEAD';
@@ -111,8 +122,10 @@ async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
 
   const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
+  // FOR NO KEY UPDATE serializes the writers of these cases but, unlike FOR
+  // UPDATE, lets a proposal referencing them take its foreign-key share lock.
   await tx.$executeRawUnsafe(
-    `SELECT id FROM "test_case" WHERE id IN (${placeholders}) ORDER BY id FOR UPDATE`,
+    `SELECT id FROM "test_case" WHERE id IN (${placeholders}) ORDER BY id FOR NO KEY UPDATE`,
     ...ids,
   );
 }
@@ -134,6 +147,13 @@ async function lockSuiteMetadata(
   if (row === undefined) return null;
 
   return { nameSource: row.nameSource, tags: row.tags ?? [] };
+}
+
+/** Rolls back a suite summary whose suite this run no longer owns. */
+class SuiteSummaryNotOwned extends Error {
+  constructor() {
+    super('suite summary is no longer queued');
+  }
 }
 
 interface SuiteSummaryLock {
@@ -212,6 +232,7 @@ export class ExtractionProcessor {
     private readonly failureRecorder: ExtractionFailureRecorder,
     private readonly proposalWriter: ExtractedProposalWriter,
     @InjectEnv() private readonly env: Env,
+    private readonly reclassifier: ProposalReclassifier,
   ) {}
 
   async process(job: Job<ExtractionJobData>): Promise<void> {
@@ -551,13 +572,33 @@ export class ExtractionProcessor {
     organizationId: string,
     summary: { title: string; description: string; tags: string[] },
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx: TxClient) => {
-      const locked = await lockSuiteForSummary(tx, suiteId);
-      if (locked === null) return true;
-      if (locked.documentationQueuedAt === null) return true;
+    try {
+      return await this.writeSuiteSummary(suiteId, organizationId, summary);
+    } catch (error) {
+      // The suite is gone, or a fresher run already wrote its summary: the
+      // transaction rolled back, credit included, and there is nothing to do.
+      if (error instanceof SuiteSummaryNotOwned) return true;
+      throw error;
+    }
+  }
 
+  private writeSuiteSummary(
+    suiteId: string,
+    organizationId: string,
+    summary: { title: string; description: string; tags: string[] },
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx: TxClient) => {
+      // Lock order, shared with the document-file job: the organization row
+      // (spending the credit updates it) before the suite row. Spending first
+      // means a run that turns out not to own the suite must roll back to give
+      // the credit back.
       const spent = await this.entitlement.spendCredit(organizationId, tx);
       if (!spent) return false;
+
+      const locked = await lockSuiteForSummary(tx, suiteId);
+      if (locked === null || locked.documentationQueuedAt === null) {
+        throw new SuiteSummaryNotOwned();
+      }
 
       const mergedTags = mergeSuiteTags(locked.tags, summary.tags);
       const nameChanged = locked.nameSource !== HUMAN_NAME_SOURCE;
@@ -685,6 +726,19 @@ export class ExtractionProcessor {
       await this.runDocumentFileExtractionUnsafe(ctx);
     } catch (error) {
       if (error instanceof RetryableProviderError) throw error;
+      // Only the documentation transaction raises this, after its in-process
+      // attempts all lost and before anything committed, so running the job
+      // again repeats no committed work. A conflict anywhere else, after the
+      // commit included, is recorded like any other failure.
+      if (
+        !ctx.isFinalAttempt &&
+        error instanceof RetryableTransactionConflictError
+      ) {
+        this.logger.warn(
+          `Document-file extraction for ${ctx.filePath} lost a transaction conflict on every attempt; the queue will retry it`,
+        );
+        throw error;
+      }
       const reason = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
         `Document-file extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
@@ -1050,38 +1104,61 @@ export class ExtractionProcessor {
     ctx: DocumentFileJobContext,
     suite: ExtractedSuite | null,
   ): Promise<boolean> {
-    const caseRows = await this.prisma.testCase.findMany({
-      where: { id: { in: matched.map(({ target }) => target.testCaseId) } },
-      select: {
-        id: true,
-        suiteId: true,
-        name: true,
-        documentationSource: true,
-        currentVersion: {
-          select: {
-            title: true,
-            objective: true,
-            preconditions: true,
-            steps: true,
-            expectedResult: true,
-            priority: true,
-            locale: true,
-          },
-        },
-      },
-    });
-    const caseInfoById = new Map(caseRows.map((row) => [row.id, row]));
+    const caseIds = matched.map(({ target }) => target.testCaseId);
+    // Suites with a case that got a new version, reclassified after commit.
+    const documentedSuiteIds = new Set<string>();
 
-    return this.prisma.$transaction(async (tx: TxClient) => {
-      await lockTestCases(
-        tx,
-        matched.map(({ target }) => target.testCaseId),
-      );
+    const write = async (tx: TxClient): Promise<boolean> => {
+      documentedSuiteIds.clear();
 
+      // Lock order, shared with every other writer: the organization row
+      // (spending the credit updates it), then the test_case rows. A push
+      // persisting proposals spends its credit first too, so the two
+      // serialize on the organization row instead of deadlocking.
       const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
       if (!spent) return false;
 
+      await lockTestCases(tx, caseIds);
+
+      // Read only once the lock is held, so every decision below (human
+      // edit, identical redelivery) sees what the previous writer committed.
+      const caseRows = await tx.testCase.findMany({
+        where: { id: { in: caseIds } },
+        select: {
+          id: true,
+          suiteId: true,
+          name: true,
+          documentationSource: true,
+          documentationQueuedAt: true,
+          currentVersion: {
+            select: {
+              title: true,
+              objective: true,
+              preconditions: true,
+              steps: true,
+              expectedResult: true,
+              priority: true,
+              locale: true,
+            },
+          },
+        },
+      });
+      const caseInfoById = new Map(caseRows.map((row) => [row.id, row]));
+
+      // The enqueue already left out cases waiting for review, but a push or
+      // a document-case job can create a proposal while this job is queued.
+      // Rechecked under the lock: documenting now would publish over a
+      // version the reviewer is about to compare against.
+      const pendingCaseIds = casesWithPendingProposal(
+        await tx.extractedProposal.findMany({
+          where: pendingProposalsWhere(caseIds),
+          select: PENDING_PROPOSAL_CASES_SELECT,
+        }),
+      );
+
+      let skippedForSupersededRun = 0;
       let skippedForHumanEdit = 0;
+      let skippedForPendingProposal = 0;
       let skippedForIdenticalRedelivery = 0;
       const suiteIds = new Set<string>();
 
@@ -1090,6 +1167,17 @@ export class ExtractionProcessor {
         if (info === undefined) continue;
 
         suiteIds.add(info.suiteId);
+
+        // The queued marker is this run's claim on the case. Whoever cleared
+        // it since the job was queued owns the outcome now: an approval that
+        // published its own version, or this job's own earlier attempt that
+        // already committed. Nothing is written, so their outcome stands.
+        // Queuing the case again sets the marker, so a deliberate re-run
+        // still documents it.
+        if (info.documentationQueuedAt === null) {
+          skippedForSupersededRun += 1;
+          continue;
+        }
 
         if (info.documentationSource === HUMAN_DOCUMENTATION_SOURCE) {
           const humanSkipState: DocumentationStateWrite = {
@@ -1103,6 +1191,21 @@ export class ExtractionProcessor {
             data: humanSkipState,
           });
           skippedForHumanEdit += 1;
+          continue;
+        }
+
+        if (pendingCaseIds.has(target.testCaseId)) {
+          const pendingSkipState: DocumentationStateWrite = {
+            documentationOutcome: 'skipped',
+            documentationSkipReason: 'already-pending',
+            documentationOutcomeAt: new Date(),
+            documentationQueuedAt: null,
+          };
+          await tx.testCase.update({
+            where: { id: target.testCaseId },
+            data: pendingSkipState,
+          });
+          skippedForPendingProposal += 1;
           continue;
         }
 
@@ -1159,6 +1262,7 @@ export class ExtractionProcessor {
           },
           this.logger,
         );
+        documentedSuiteIds.add(info.suiteId);
 
         await tx.extractedProposal.deleteMany({
           where: {
@@ -1169,9 +1273,21 @@ export class ExtractionProcessor {
         });
       }
 
+      if (skippedForSupersededRun > 0) {
+        this.logger.log(
+          `Skipped documenting ${skippedForSupersededRun} case(s) in ${ctx.filePath}: superseded, their documentation run is no longer queued`,
+        );
+      }
+
       if (skippedForHumanEdit > 0) {
         this.logger.log(
           `Skipped documenting ${skippedForHumanEdit} case(s) in ${ctx.filePath}: a human already edited their documentation`,
+        );
+      }
+
+      if (skippedForPendingProposal > 0) {
+        this.logger.log(
+          `Skipped documenting ${skippedForPendingProposal} case(s) in ${ctx.filePath}: a proposal for them is waiting for review`,
         );
       }
 
@@ -1184,7 +1300,33 @@ export class ExtractionProcessor {
       await this.applySuiteMetadata(tx, suite, [...suiteIds]);
 
       return true;
+    };
+
+    // A conflict rolls this transaction back whole, so only the transaction
+    // runs again, in process: the extraction and the credit are not repeated.
+    // When every attempt loses, the job goes back to the queue, which is safe
+    // because nothing of it committed.
+    const written = await retryTransientConflicts(() =>
+      this.prisma.$transaction(write),
+    ).catch((error: unknown) => {
+      if (!isTransientTransactionConflict(error)) throw error;
+      throw new RetryableTransactionConflictError(
+        `documenting ${ctx.filePath}`,
+        error,
+      );
     });
+
+    // New documentation changes what a waiting proposal duplicates or
+    // updates, so its duplicateKind and matched case are recomputed, the same
+    // way a push that writes proposals does. Only after the commit, so the
+    // reclassify job reads the new versions.
+    if (written) {
+      for (const suiteId of documentedSuiteIds) {
+        await this.reclassifier.enqueue(suiteId);
+      }
+    }
+
+    return written;
   }
 
   private async applySuiteMetadata(
@@ -1260,6 +1402,21 @@ export class ExtractionProcessor {
       await this.runExtractionUnsafe(ctx);
     } catch (error) {
       if (error instanceof RetryableProviderError) throw error;
+      // Only a document-case job (the one with a target case) is retried
+      // here; a code-change job keeps its own failure handling.
+      if (
+        ctx.targetTestCaseId !== null &&
+        !ctx.isFinalAttempt &&
+        isTransientTransactionConflict(error)
+      ) {
+        this.logger.warn(
+          `Documenting case ${ctx.targetTestCaseId} lost a transaction conflict; the queue will retry it`,
+        );
+        throw new RetryableTransactionConflictError(
+          `documenting case ${ctx.targetTestCaseId}`,
+          error,
+        );
+      }
       const reason = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
         `Extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,

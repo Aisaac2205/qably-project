@@ -244,6 +244,68 @@ describe('ReviewProposalInspector', () => {
     })
   })
 
+  describe('documentation in progress on the case', () => {
+    const notice =
+      'Aeris is documenting this case. If you approve now, your approval wins and Aeris skips this case.'
+
+    function caseWith(documentation: { queuedAt: string | null; outcomeAt: string | null }) {
+      return {
+        id: 'case-1',
+        name: 'Empties the cart',
+        suiteId: 'suite-1',
+        suiteName: 'Checkout',
+        documentation,
+      }
+    }
+
+    it('warns that approving may conflict while Aeris documents the case the proposal updates', async () => {
+      await act(async () => {
+        renderInspectorWithDetail(proposal({ targetOfficialTestCaseId: 'case-1' }), {
+          matchedCase: caseWith({ queuedAt: '2026-10-20T10:00:00.000Z', outcomeAt: null }),
+        })
+      })
+
+      expect(screen.getByRole('note')).toHaveTextContent(notice)
+    })
+
+    it('says nothing once the documentation has finished', async () => {
+      await act(async () => {
+        renderInspectorWithDetail(proposal({ targetOfficialTestCaseId: 'case-1' }), {
+          matchedCase: caseWith({
+            queuedAt: '2026-10-20T10:00:00.000Z',
+            outcomeAt: '2026-10-20T10:01:00.000Z',
+          }),
+        })
+      })
+
+      expect(screen.queryByText(notice)).not.toBeInTheDocument()
+    })
+
+    it('says nothing on a proposal that was already decided', async () => {
+      await act(async () => {
+        renderInspectorWithDetail(
+          proposal({ status: 'approved', targetOfficialTestCaseId: 'case-1' }),
+          { matchedCase: caseWith({ queuedAt: '2026-10-20T10:00:00.000Z', outcomeAt: null }) },
+        )
+      })
+
+      expect(screen.queryByText(notice)).not.toBeInTheDocument()
+    })
+
+    it('warns in Spanish too', async () => {
+      useI18nStore.setState({ locale: 'es' })
+      await act(async () => {
+        renderInspectorWithDetail(proposal({ targetOfficialTestCaseId: 'case-1' }), {
+          matchedCase: caseWith({ queuedAt: '2026-10-20T10:00:00.000Z', outcomeAt: null }),
+        })
+      })
+
+      expect(screen.getByRole('note')).toHaveTextContent(
+        'Aeris está documentando este caso. Si apruebas ahora, tu aprobación prevalece y Aeris omite este caso.',
+      )
+    })
+  })
+
   describe('publication and diff detail (S5c)', () => {
     it('shows the diff against the published version and the matched case link once the detail loads', async () => {
       await act(async () => {
@@ -253,8 +315,10 @@ describe('ReviewProposalInspector', () => {
             name: 'Empties the cart',
             suiteId: 'suite-1',
             suiteName: 'Checkout',
+            documentation: { queuedAt: null, outcomeAt: null },
           },
           publishedVersion: {
+            id: 'version-4',
             version: 4,
             title: 'Empties the cart',
             objective: 'Confirm the cart resets',

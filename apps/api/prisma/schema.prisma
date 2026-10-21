@@ -541,6 +541,12 @@ model ExtractedProposal {
   duplicateReasons Json?
   classifiedAt     DateTime?
 
+  /// The published version of the target case that approving this proposal
+  /// replaced. Written on approval; null for a proposal that is not approved,
+  /// that was approved as a new case or before this column existed. A plain
+  /// id, not a foreign key: it is a snapshot of what was replaced.
+  supersededVersionId String?
+
   @@unique([codeChangeId, automationKey])
   @@index([projectId])
   @@index([projectId, status])

@@ -109,6 +109,23 @@ describe('unwrapDecision', () => {
     });
   });
 
+  it('throws a coded 409 when the case moved past the version the proposal was reviewed against', async () => {
+    const lastDecision = jest.fn();
+
+    const thrown: unknown = await unwrapDecision(
+      err('stale-proposal'),
+      lastDecision,
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    expect((thrown as ConflictException).getResponse()).toEqual({
+      code: 'stale-proposal',
+      message:
+        'The case has a newer published version than the one this proposal was reviewed against',
+    });
+    expect(lastDecision).not.toHaveBeenCalled();
+  });
+
   it('delegates every other error to the plain unwrap mapping', async () => {
     const lastDecision = jest.fn();
 
