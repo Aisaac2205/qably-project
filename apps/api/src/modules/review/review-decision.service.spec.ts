@@ -63,6 +63,7 @@ interface FakePrisma {
   reviewDecision: { create: jest.Mock; findFirst: jest.Mock };
   traceabilityLink: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
+  $queryRawUnsafe: jest.Mock;
 }
 
 function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
@@ -94,6 +95,9 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
     },
     $transaction: jest.fn(),
+    $queryRawUnsafe: jest
+      .fn()
+      .mockResolvedValue([{ currentVersionId: 'version-current' }]),
   };
 
   prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
@@ -1454,5 +1458,57 @@ describe('ReviewDecisionService.lastDecision', () => {
     await expect(build(prisma).lastDecision(org, 'proposal-1')).rejects.toThrow(
       'Unexpected review decision action: changes_requested',
     );
+  });
+});
+
+describe('ReviewDecisionService.approve case lock', () => {
+  const LOCK_SQL = /FROM "test_case" WHERE id = \$1 FOR UPDATE$/;
+
+  function lockCalls(prisma: FakePrisma): [string, string][] {
+    return (prisma.$queryRawUnsafe.mock.calls as [string, string][]).filter(
+      ([sql]) => LOCK_SQL.test(sql),
+    );
+  }
+
+  it('locks the target case row before it claims the proposal and counts the versions', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(lockCalls(prisma)).toEqual([[expect.any(String), 'case-existing']]);
+    const [lockOrder] = prisma.$queryRawUnsafe.mock.invocationCallOrder;
+    const [claimOrder] =
+      prisma.extractedProposal.updateMany.mock.invocationCallOrder;
+    const [countOrder] = prisma.testCaseVersion.count.mock.invocationCallOrder;
+    expect(lockOrder).toBeLessThan(claimOrder);
+    expect(lockOrder).toBeLessThan(countOrder);
+  });
+
+  it('locks the matched case when a possible duplicate is applied to it', async () => {
+    const prisma = createPrisma({
+      duplicateKind: 'possible_duplicate',
+      matchedCaseId: 'case-matched',
+      matchedCase: {
+        id: 'case-matched',
+        projectId: 'project-1',
+        suiteId: 'suite-1',
+        automationFilePath: null,
+      },
+    });
+
+    await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'matched-case',
+    });
+
+    expect(lockCalls(prisma)).toEqual([[expect.any(String), 'case-matched']]);
+  });
+
+  it('takes no case lock when the approval creates a new case', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 });

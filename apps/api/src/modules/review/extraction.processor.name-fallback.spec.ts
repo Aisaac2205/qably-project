@@ -113,6 +113,9 @@ function createPrisma(store: CaseNameStore) {
     $transaction: jest.fn(store.transaction),
   };
 
+  // The job reads its targets inside the transaction, once they are locked.
+  Object.assign(store.tx.testCase, { findMany: prisma.testCase.findMany });
+
   return prisma;
 }
 

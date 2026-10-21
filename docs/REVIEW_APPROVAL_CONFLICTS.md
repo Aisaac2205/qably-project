@@ -15,17 +15,18 @@ Approving a proposal can fail because the official case it would create or updat
 
 Approval runs in one transaction (`ReviewDecisionService.publish`, `apps/api/src/modules/review/review-decision.service.ts`):
 
-1. Claim the proposal: `in_review` to `approved`.
-2. With no `targetTestCaseId`, create a `TestCase` with `name = proposal.title` and, when the proposal has an `automationKey`, `automationKey = proposal.automationKey`.
-3. With a target, publish a new version and rewrite the target's `name`. The flow rewrites the target's `automationKey` only when the proposal carries one; a proposal without an `automationKey` leaves the target's key untouched.
+1. With a target, lock its `test_case` row (`SELECT ... FOR UPDATE`, `lockTestCaseForUpdate` in `apps/api/src/modules/review/lib/lock-test-case.ts`). The lock comes before the claim and before the versions are counted, so two writers of the same case publish one after the other: version n+1 is computed by one writer at a time. A document-file job takes the same lock, after spending its credit; approval spends none, so it has no organization row to lock first.
+2. Claim the proposal: `in_review` to `approved`.
+3. With no `targetTestCaseId`, create a `TestCase` with `name = proposal.title` and, when the proposal has an `automationKey`, `automationKey = proposal.automationKey`.
+4. With a target, publish a new version and rewrite the target's `name`. The flow rewrites the target's `automationKey` only when the proposal carries one; a proposal without an `automationKey` leaves the target's key untouched.
 
-Steps 2 and 3 can break these constraints (`apps/api/prisma/schema.prisma`, model `TestCase`):
+Steps 3 and 4 can break these constraints (`apps/api/prisma/schema.prisma`, model `TestCase`):
 
 | Constraint | Postgres index | Code |
 |---|---|---|
 | `@@unique([suiteId, name])` | `test_case_suiteId_name_key` | `name-taken` |
 | `@@unique([suiteId, automationKey])` | `test_case_suiteId_automationKey_key` | `automation-key-taken` |
-| Any other unique index, for example `test_case_version_testCaseId_version_key` when two approvals publish to the same case at once | varies | `publish-conflict` |
+| Any other unique index, for example `test_case_version_testCaseId_version_key` if a writer publishes a version without taking the case lock | varies | `publish-conflict` |
 
 When a constraint fails, the transaction rolls back, so the proposal stays `in_review`. Retrying the same approval fails the same way until the data changes.
 
@@ -132,7 +133,7 @@ Conflicting case lookup failed: proposal=<proposalId> suite=<suiteId>
 | The target case is renamed to a title another case in the suite already uses | name | Yes | Possible |
 | An official case gets the same `automationKey` after the proposal was written (ingestion or another approval) | automationKey | No: ingestion and approval both reclassify the suite (approval through the `proposal.approved` event, see `DOMAIN_EVENTS.md`), which sets the target | Unlikely to persist |
 | The proposal has no `suiteId`, so approval falls back to the default suite, which the reclassifier never visits | automationKey | Yes | Edge case |
-| Two approvals publish a version to the same case at the same time | other (`publish-conflict`) | No | Race |
+| Two writers (approvals, document-file jobs) publish a version to the same case at the same time | other (`publish-conflict`) | No | Prevented: both take the case lock before counting versions, so the second waits and publishes the next number |
 
 Which constraint fired for the production reports of September 2026 is unverified. The new log line answers it the next time a reviewer hits the conflict.
 

@@ -384,7 +384,18 @@ describe('ExtractionProcessor — name collision diagnostics', () => {
       ...prisma,
       testCase: {
         ...prisma.testCase,
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'case-1',
+            suiteId: 'suite-1',
+            documentationSource: 'ingestion',
+          },
+          {
+            id: 'case-2',
+            suiteId: 'suite-1',
+            documentationSource: 'ingestion',
+          },
+        ]),
         update: jest.fn().mockRejectedValue(error),
       },
     };
@@ -392,10 +403,6 @@ describe('ExtractionProcessor — name collision diagnostics', () => {
       run(tx),
     );
     prisma.testCase.findMany
-      .mockResolvedValueOnce([
-        { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
-        { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
-      ])
       .mockResolvedValueOnce([
         { id: 'case-1', suiteId: 'suite-1' },
         { id: 'case-2', suiteId: 'suite-1' },
@@ -451,8 +458,13 @@ describe('ExtractionProcessor — name collision diagnostics', () => {
 
     await processor.process(documentFileJob());
 
-    expect(tx.testCase.findMany).not.toHaveBeenCalled();
-    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(3);
+    // The one read inside the transaction is the locked read of the targets,
+    // made before the write that aborts it.
+    expect(tx.testCase.findMany).toHaveBeenCalledTimes(1);
+    const [lockedReadOrder] = tx.testCase.findMany.mock.invocationCallOrder;
+    const [abortOrder] = tx.testCase.update.mock.invocationCallOrder;
+    expect(lockedReadOrder).toBeLessThan(abortOrder);
+    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(2);
   });
 
   it('leaves the existing failure handling untouched: the original error still reaches the catch-all', async () => {
@@ -481,12 +493,7 @@ describe('ExtractionProcessor — name collision diagnostics', () => {
   it('still rethrows the original error when the diagnosis lookup itself fails', async () => {
     const { prisma } = collidingPrisma();
     prisma.testCase.findMany.mockReset();
-    prisma.testCase.findMany
-      .mockResolvedValueOnce([
-        { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
-        { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
-      ])
-      .mockRejectedValue(new Error('connection lost'));
+    prisma.testCase.findMany.mockRejectedValue(new Error('connection lost'));
     const { processor, error } = build(
       prisma,
       sourceReaderReturning(SOURCE_BODY, false),
@@ -516,7 +523,7 @@ describe('ExtractionProcessor — name collision diagnostics', () => {
 
     await processor.process(documentFileJob());
 
-    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.testCase.findMany).not.toHaveBeenCalled();
     expect(
       (error.mock.calls as [string][]).some(([message]) =>
         message.includes('unique (suiteId, name) constraint'),
@@ -534,6 +541,6 @@ describe('ExtractionProcessor — name collision diagnostics', () => {
 
     await processor.process(documentFileJob());
 
-    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.testCase.findMany).not.toHaveBeenCalled();
   });
 });

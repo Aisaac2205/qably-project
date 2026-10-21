@@ -471,7 +471,15 @@ One request enqueues at most `MAX_DOCUMENT_FILES_PER_REQUEST` files. A first con
 
 The job id is `buildJobId('document-file', [projectId, filePath, chunkIndex])` (`apps/api/src/common/queue/job-id.ts`): the kind, a dash and the SHA-256 of the JSON-encoded components, so BullMQ never sees a raw `:` or a path in the id. The project id is not decoration: two organizations routinely hold a file at the same relative path, and an id built from the path alone would let BullMQ deduplicate one organization's job against another's, leaving the second silently unprocessed while its HTTP response claimed success. Scoping it also makes a repeated identical request idempotent instead of doubling the work.
 
-Writing the documentation takes a row lock (`SELECT ... FOR UPDATE`, ordered by id) on the target `test_case` rows at the top of the transaction, before the credit is spent. The read of the current version that precedes each write is not atomic on its own: a chunk redelivered after the worker lock expires could read the old version concurrently with the original and publish a second version for the same case, spending a second credit for one chunk. The lock makes the second writer wait and then observe what the first wrote, and `isSameDocumentation` lets it skip a case whose current version already matches. Ordering the ids keeps two chunks with overlapping targets from deadlocking against each other.
+Writing the documentation is one transaction (`ExtractionProcessor.writeDocumentFileTargets`) that takes its locks in a fixed order:
+
+1. **Spend the credit.** `AiEntitlementService.spendCredit` updates the organization row, which locks it until the commit.
+2. **Lock the target cases.** `SELECT ... FOR UPDATE` on the target `test_case` rows, ordered by id, so two chunks with overlapping targets never deadlock against each other.
+3. **Read the cases.** The name, `documentationSource` and current version of every target are read only now, inside the transaction and after the lock.
+
+The order is the one every writer of a case follows: organization row first, then `test_case` rows. A push that persists proposals (`ExtractedProposalWriter.persistExtracted`) spends its credit first too, then touches the cases through the proposals' foreign keys, so the two serialize on the organization row instead of deadlocking. Approving a proposal spends no credit and locks its case before anything else (see `docs/REVIEW_APPROVAL_CONFLICTS.md`).
+
+Reading after the lock is what makes the decisions below it sound. A chunk redelivered after the worker lock expires waits for the original to commit and then sees the version it published, so `isSameDocumentation` skips the case instead of publishing the same documentation twice. A person who edits a case while the job waits for the lock is seen too: the `human-documented` skip reads the committed `documentationSource`, not a value read before the wait.
 
 ### Chunking, and why the 20-case cap stays
 

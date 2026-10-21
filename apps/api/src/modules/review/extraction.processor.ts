@@ -1050,36 +1050,41 @@ export class ExtractionProcessor {
     ctx: DocumentFileJobContext,
     suite: ExtractedSuite | null,
   ): Promise<boolean> {
-    const caseRows = await this.prisma.testCase.findMany({
-      where: { id: { in: matched.map(({ target }) => target.testCaseId) } },
-      select: {
-        id: true,
-        suiteId: true,
-        name: true,
-        documentationSource: true,
-        currentVersion: {
-          select: {
-            title: true,
-            objective: true,
-            preconditions: true,
-            steps: true,
-            expectedResult: true,
-            priority: true,
-            locale: true,
-          },
-        },
-      },
-    });
-    const caseInfoById = new Map(caseRows.map((row) => [row.id, row]));
+    const caseIds = matched.map(({ target }) => target.testCaseId);
 
     return this.prisma.$transaction(async (tx: TxClient) => {
-      await lockTestCases(
-        tx,
-        matched.map(({ target }) => target.testCaseId),
-      );
-
+      // Lock order, shared with every other writer: the organization row
+      // (spending the credit updates it), then the test_case rows. A push
+      // persisting proposals spends its credit first too, so the two
+      // serialize on the organization row instead of deadlocking.
       const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
       if (!spent) return false;
+
+      await lockTestCases(tx, caseIds);
+
+      // Read only once the lock is held, so every decision below (human
+      // edit, identical redelivery) sees what the previous writer committed.
+      const caseRows = await tx.testCase.findMany({
+        where: { id: { in: caseIds } },
+        select: {
+          id: true,
+          suiteId: true,
+          name: true,
+          documentationSource: true,
+          currentVersion: {
+            select: {
+              title: true,
+              objective: true,
+              preconditions: true,
+              steps: true,
+              expectedResult: true,
+              priority: true,
+              locale: true,
+            },
+          },
+        },
+      });
+      const caseInfoById = new Map(caseRows.map((row) => [row.id, row]));
 
       let skippedForHumanEdit = 0;
       let skippedForIdenticalRedelivery = 0;

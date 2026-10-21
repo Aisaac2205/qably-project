@@ -17,6 +17,7 @@ import type {
   RejectionView,
   ReviewError,
 } from './review.contracts';
+import { lockTestCaseForUpdate } from './lib/lock-test-case';
 import { publishTestCaseVersion } from './lib/publish-test-case-version';
 
 const PENDING_STATUS = 'in_review';
@@ -335,6 +336,14 @@ export class ReviewDecisionService {
     input: DecisionInput,
   ): Promise<ApprovalView> {
     return this.prisma.$transaction(async (tx) => {
+      // The case lock comes first, before the claim: a document-file job
+      // holds the same lock while it deletes proposals of that case, so
+      // claiming first could deadlock against it. Approval spends no credit,
+      // so there is no organization row to lock ahead of it.
+      if (proposal.targetTestCaseId !== null) {
+        await lockTestCaseForUpdate(tx, proposal.targetTestCaseId);
+      }
+
       const claim = await tx.extractedProposal.updateMany({
         where: { id: proposal.id, status: PENDING_STATUS },
         data: { status: 'approved' },
