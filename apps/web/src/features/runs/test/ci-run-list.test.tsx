@@ -170,7 +170,7 @@ describe('CiRunList states', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'How to report results from CI' })).toHaveAttribute(
       'href',
-      expect.stringContaining('#step-4-report-ci'),
+      expect.stringMatching(/\/docs\/quickstart#step-4-report-ci$/),
     )
     expect(screen.getAllByRole('link')).toHaveLength(1)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
