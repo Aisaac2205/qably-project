@@ -206,6 +206,7 @@ function build(
       { publish } as never,
     ),
     env,
+    { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
   );
 }
 

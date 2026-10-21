@@ -95,7 +95,9 @@ function createTx(rows: ReturnType<typeof caseRow>[]) {
 type FakeTx = ReturnType<typeof createTx>;
 
 function createPrisma(tx: FakeTx) {
-  return {
+  const prisma = {
+    /** Transactions whose callback resolved, the fake's notion of a commit. */
+    commits: 0,
     codeChange: { findFirst: jest.fn().mockResolvedValue(null) },
     testCase: {
       findUnique: jest.fn().mockResolvedValue({
@@ -105,8 +107,14 @@ function createPrisma(tx: FakeTx) {
       findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: jest.fn((run: (client: FakeTx) => unknown) => run(tx)),
+    $transaction: jest.fn(async (run: (client: FakeTx) => unknown) => {
+      const result = await run(tx);
+      prisma.commits += 1;
+      return result;
+    }),
   };
+
+  return prisma;
 }
 
 type FakePrisma = ReturnType<typeof createPrisma>;
@@ -159,6 +167,7 @@ function build(
       { publish: jest.fn() } as never,
     ),
     { GEMINI_MODEL: 'gemini-test' } as Env,
+    reclassifier as never,
   );
 
   jest.spyOn(processor['logger'], 'log').mockImplementation(() => undefined);
@@ -455,5 +464,71 @@ describe('ExtractionProcessor — documentation jobs that lose a transaction con
       ).resolves.toBeUndefined();
       expect(failureWrites(prisma)).toHaveLength(1);
     });
+  });
+});
+
+describe('ExtractionProcessor — reclassifying after documenting', () => {
+  function recordingReclassifier(prisma: FakePrisma) {
+    const commitsSeen: number[] = [];
+    const enqueue = jest.fn(() => {
+      commitsSeen.push(prisma.commits);
+      return Promise.resolve();
+    });
+    return { reclassifier: { enqueue }, commitsSeen };
+  }
+
+  it('reclassifies the suite of the cases it documented, once the transaction has committed', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    const prisma = createPrisma(tx);
+    const { reclassifier, commitsSeen } = recordingReclassifier(prisma);
+    const { processor } = build(prisma, fakeEntitlement(), reclassifier);
+
+    await processor.process(documentFileJob());
+
+    expect(reclassifier.enqueue.mock.calls).toEqual([['suite-1']]);
+    expect(commitsSeen).toEqual([1]);
+  });
+
+  it('reclassifies each suite the documented cases belong to', async () => {
+    const tx = createTx([
+      caseRow('case-1'),
+      caseRow('case-2', { suiteId: 'suite-2' }),
+    ]);
+    const prisma = createPrisma(tx);
+    const { reclassifier } = recordingReclassifier(prisma);
+    const { processor } = build(prisma, fakeEntitlement(), reclassifier);
+
+    await processor.process(documentFileJob());
+
+    expect(reclassifier.enqueue.mock.calls).toEqual([['suite-1'], ['suite-2']]);
+  });
+
+  it('reclassifies nothing when every case was skipped', async () => {
+    const tx = createTx([
+      caseRow('case-1', { documentationSource: 'human' }),
+      caseRow('case-2'),
+    ]);
+    tx.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-2', matchedCaseId: null },
+    ]);
+    const prisma = createPrisma(tx);
+    const { reclassifier } = recordingReclassifier(prisma);
+    const { processor } = build(prisma, fakeEntitlement(), reclassifier);
+
+    await processor.process(documentFileJob());
+
+    expect(reclassifier.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('reclassifies nothing when the transaction rolled back', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.testCase.update.mockRejectedValue(new Error('boom'));
+    const prisma = createPrisma(tx);
+    const { reclassifier } = recordingReclassifier(prisma);
+    const { processor } = build(prisma, fakeEntitlement(), reclassifier);
+
+    await processor.process(documentFileJob());
+
+    expect(reclassifier.enqueue).not.toHaveBeenCalled();
   });
 });

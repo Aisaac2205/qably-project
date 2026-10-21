@@ -79,6 +79,7 @@ import {
 } from './extraction.types';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
+import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 
 const MAX_CASE_OBSERVATIONS = CASE_LIMITS.observations;
 const HEAD_REF = 'HEAD';
@@ -221,6 +222,7 @@ export class ExtractionProcessor {
     private readonly failureRecorder: ExtractionFailureRecorder,
     private readonly proposalWriter: ExtractedProposalWriter,
     @InjectEnv() private readonly env: Env,
+    private readonly reclassifier: ProposalReclassifier,
   ) {}
 
   async process(job: Job<ExtractionJobData>): Promise<void> {
@@ -1069,8 +1071,12 @@ export class ExtractionProcessor {
     suite: ExtractedSuite | null,
   ): Promise<boolean> {
     const caseIds = matched.map(({ target }) => target.testCaseId);
+    // Suites with a case that got a new version, reclassified after commit.
+    const documentedSuiteIds = new Set<string>();
 
-    return this.prisma.$transaction(async (tx: TxClient) => {
+    const written = await this.prisma.$transaction(async (tx: TxClient) => {
+      documentedSuiteIds.clear();
+
       // Lock order, shared with every other writer: the organization row
       // (spending the credit updates it), then the test_case rows. A push
       // persisting proposals spends its credit first too, so the two
@@ -1209,6 +1215,7 @@ export class ExtractionProcessor {
           },
           this.logger,
         );
+        documentedSuiteIds.add(info.suiteId);
 
         await tx.extractedProposal.deleteMany({
           where: {
@@ -1241,6 +1248,18 @@ export class ExtractionProcessor {
 
       return true;
     });
+
+    // New documentation changes what a waiting proposal duplicates or
+    // updates, so its duplicateKind and matched case are recomputed, the same
+    // way a push that writes proposals does. Only after the commit, so the
+    // reclassify job reads the new versions.
+    if (written) {
+      for (const suiteId of documentedSuiteIds) {
+        await this.reclassifier.enqueue(suiteId);
+      }
+    }
+
+    return written;
   }
 
   private async applySuiteMetadata(

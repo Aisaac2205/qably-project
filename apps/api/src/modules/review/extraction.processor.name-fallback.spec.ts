@@ -153,6 +153,7 @@ function build(prisma: FakePrisma, extractor: TestCaseExtractor) {
       { publish: jest.fn() } as never,
     ),
     { GEMINI_MODEL: 'gemini-test' } as Env,
+    { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
   );
 
   const warn = jest
