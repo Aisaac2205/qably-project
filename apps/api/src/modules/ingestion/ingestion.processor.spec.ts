@@ -20,6 +20,8 @@ const defaultEvent = {
   organizationId: 'org-1',
   provider: 'GITHUB',
   repo: 'acme/shop',
+  branch: 'main',
+  defaultBranch: 'main' as string | null,
   commitSha: TIP,
   changedFiles: ['src/cart.spec.ts', 'src/cart.ts'],
   commits: [] as StoredCommit[],
@@ -550,6 +552,117 @@ describe('IngestionProcessor', () => {
       codeChanges,
       'org-1',
     );
+  });
+
+  describe('extraction branch gate', () => {
+    async function runOn(event: {
+      branch: string;
+      defaultBranch: string | null;
+    }) {
+      const prisma = createPrisma({
+        ...defaultEvent,
+        ...event,
+        connection: {
+          projects: [
+            { id: 'proj-1', testFilePatterns: ['*.spec.ts'] },
+            { id: 'proj-2', testFilePatterns: ['*.spec.ts'] },
+          ],
+        },
+      });
+      const extraction = createExtraction();
+
+      await new IngestionProcessor(
+        prisma as never,
+        createEvents() as never,
+        extraction as never,
+      ).process(job('event-1'));
+
+      return { prisma, extraction };
+    }
+
+    let log: jest.SpyInstance;
+
+    beforeEach(() => {
+      log = jest
+        .spyOn(Logger.prototype, 'log')
+        .mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      log.mockRestore();
+    });
+
+    it('loads the pushed branch and the default branch of the event', async () => {
+      const prisma = createPrisma();
+
+      await new IngestionProcessor(
+        prisma as never,
+        createEvents() as never,
+        createExtraction() as never,
+      ).process(job('event-1'));
+
+      const [[query]] = prisma.scmEvent.findUnique.mock.calls as [
+        [{ select: Record<string, unknown> }],
+      ];
+
+      expect(query.select).toEqual(
+        expect.objectContaining({ branch: true, defaultBranch: true }),
+      );
+    });
+
+    it('records every batch but enqueues no extraction for a branch other than the default', async () => {
+      const { prisma, extraction } = await runOn({
+        branch: 'feat/cart',
+        defaultBranch: 'main',
+      });
+
+      expect(prisma.ingestionBatch.create).toHaveBeenCalledTimes(2);
+      expect(extraction.enqueueCodeChanges).not.toHaveBeenCalled();
+      expect(prisma.scmEvent.update).toHaveBeenCalledWith({
+        where: { id: 'event-1' },
+        data: { status: 'PROCESSED' },
+      });
+    });
+
+    it('enqueues extraction for every project when the push is on the default branch', async () => {
+      const { extraction } = await runOn({
+        branch: 'main',
+        defaultBranch: 'main',
+      });
+
+      expect(extraction.enqueueCodeChanges).toHaveBeenCalledTimes(2);
+      expect(log).not.toHaveBeenCalled();
+    });
+
+    it('enqueues extraction when the default branch is unknown', async () => {
+      const { extraction } = await runOn({
+        branch: 'feat/cart',
+        defaultBranch: null,
+      });
+
+      expect(extraction.enqueueCodeChanges).toHaveBeenCalledTimes(2);
+      expect(log).not.toHaveBeenCalled();
+    });
+
+    it('compares branch names exactly, so a different case is another branch', async () => {
+      const { extraction } = await runOn({
+        branch: 'Main',
+        defaultBranch: 'main',
+      });
+
+      expect(extraction.enqueueCodeChanges).not.toHaveBeenCalled();
+    });
+
+    it('logs one line naming the repository, both branches and the file count when it skips', async () => {
+      await runOn({ branch: 'feat/cart', defaultBranch: 'main' });
+
+      expect(log).toHaveBeenCalledTimes(1);
+      const [message] = log.mock.calls[0] as [string];
+      expect(message).toContain('acme/shop');
+      expect(message).toContain('feat/cart');
+      expect(message).toContain('main');
+      expect(message).toContain('changed files: 2');
+    });
   });
 
   it('marks the event processed even when nothing was worth extracting', async () => {

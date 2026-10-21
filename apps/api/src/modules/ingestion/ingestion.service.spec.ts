@@ -8,7 +8,7 @@ const secret = 'connection-secret';
 
 const pushPayload = {
   ref: 'refs/heads/main',
-  repository: { full_name: 'acme/shop' },
+  repository: { full_name: 'acme/shop', default_branch: 'main' },
   pusher: { name: 'ada' },
   head_commit: {
     id: 'a'.repeat(40),
@@ -184,6 +184,7 @@ describe('IngestionService.ingest', () => {
       kind: 'PUSH',
       repo: 'acme/shop',
       branch: 'main',
+      defaultBranch: 'main',
       commitSha: 'a'.repeat(40),
       author: 'ada',
       title: 'Add checkout guard',
@@ -193,6 +194,47 @@ describe('IngestionService.ingest', () => {
       forced: false,
       commitsTruncated: false,
       commits: { create: [] },
+    });
+  });
+
+  describe('default branch column', () => {
+    async function storedBranches(
+      payload: Record<string, unknown>,
+    ): Promise<{ branch: unknown; defaultBranch: unknown }> {
+      const prisma = createPrisma();
+      const body = JSON.stringify(payload);
+
+      await build(prisma, createEncryption(), createQueue()).ingest(
+        'github',
+        body,
+        githubHeaders(body),
+      );
+
+      const [call] = prisma.scmEvent.create.mock.calls as [
+        [{ data: { branch: unknown; defaultBranch: unknown } }],
+      ];
+
+      const { branch, defaultBranch } = call[0].data;
+
+      return { branch, defaultBranch };
+    }
+
+    it('stores the default branch next to the pushed branch', async () => {
+      const stored = await storedBranches({
+        ...pushPayload,
+        ref: 'refs/heads/feat/cart',
+      });
+
+      expect(stored).toEqual({ branch: 'feat/cart', defaultBranch: 'main' });
+    });
+
+    it('stores null when the payload does not name a default branch', async () => {
+      const stored = await storedBranches({
+        ...pushPayload,
+        repository: { full_name: 'acme/shop' },
+      });
+
+      expect(stored.defaultBranch).toBeNull();
     });
   });
 
@@ -332,6 +374,7 @@ describe('IngestionService.ingest', () => {
         kind: 'push' as const,
         repo: 'acme/shop',
         branch: 'main',
+        defaultBranch: null,
         commitSha: 'a'.repeat(40),
         author: 'ada',
         title: 'Add checkout guard',

@@ -93,6 +93,8 @@ export class BitbucketAdapter implements ScmPayloadAdapter {
       kind: 'push',
       repo,
       branch: change.name ?? '',
+      // A Bitbucket webhook does not name the repository's main branch.
+      defaultBranch: null,
       commitSha: change.target.hash,
       author: payload.actor?.display_name ?? 'unknown',
       title: change.target.message ?? '',
@@ -121,6 +123,7 @@ export class BitbucketAdapter implements ScmPayloadAdapter {
       kind: 'pull_request',
       repo,
       branch: pull?.source?.branch?.name ?? '',
+      defaultBranch: null,
       commitSha,
       author: payload.actor?.display_name ?? 'unknown',
       title: pull?.title ?? '',

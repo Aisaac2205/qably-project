@@ -171,6 +171,7 @@ export class IngestionService {
           kind: KIND_COLUMN[event.kind],
           repo: event.repo,
           branch: event.branch,
+          defaultBranch: event.defaultBranch,
           commitSha: event.commitSha,
           author: event.author,
           title: event.title,

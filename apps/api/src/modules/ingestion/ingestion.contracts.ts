@@ -35,6 +35,11 @@ export interface NormalizedScmEvent {
   kind: ScmEventKind;
   repo: string;
   branch: string;
+  /**
+   * The repository's default branch as the provider delivered it, trimmed; null
+   * when the payload does not carry it. Null means unknown, never "no gate".
+   */
+  defaultBranch: string | null;
   commitSha: string;
   author: string;
   title: string;

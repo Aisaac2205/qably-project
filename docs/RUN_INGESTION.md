@@ -1049,6 +1049,41 @@ These are the queue's `defaultJobOptions`; an individual `queue.add` call can st
 them for a specific job (for example the deterministic `jobId` used for webhook idempotency), but no
 call currently needs to.
 
+### Which pushes start AI extraction
+
+The review inbox is fed from the repository's default branch, not from every branch. Without that
+rule a push to a feature branch and the merge of the same code into the default branch each sent
+every touched test file through extraction, and the inbox received the same proposals twice.
+
+`IngestionProcessor` still records an `IngestionBatch` and its `CodeChange` rows for every push, on any
+branch, because other features read them (commit attribution, the repository page). Only the
+`ExtractionService.enqueueCodeChanges` call is gated:
+
+```text
+extract  =  defaultBranch is null  OR  branch === defaultBranch
+```
+
+| Field | Where it comes from |
+|---|---|
+| `branch` | `ScmEvent.branch`: the pushed ref without `refs/heads/`. A tag push keeps `refs/tags/...`, so it never equals a branch name. |
+| `defaultBranch` | `ScmEvent.defaultBranch`, stored when the delivery is received. GitHub: `repository.default_branch` of the `push` payload, trimmed. A `pull_request` payload uses the repository the pull request targets, never the fork the head branch lives in. Bitbucket and any payload that omits or blanks the field: `null`. |
+
+Notes:
+
+- **Unknown fails open.** A `null` default branch extracts, as before. The column is nullable and was
+  not backfilled, so events stored before it existed read as unknown and behave exactly as they did.
+  Skipping on missing data would silently stop a project's catalog; extracting only repeats work.
+- The comparison is exact and case-sensitive, like git branch names.
+- The default branch is the one the provider reported on that delivery, so renaming it on GitHub
+  takes effect from the next push. Nothing is cached on the connection.
+- A skipped push logs one line (`Skipped extraction for <repo>: pushed branch "..." is not the
+  default branch "..." (changed files: N)`). It carries no commit message or author. The event is
+  still marked `PROCESSED`.
+- Pull request events and Bitbucket pushes carry no changed files, so they record no batch and never
+  extracted; the rule changes nothing for them.
+- Migration `20261021100000_add_scm_event_default_branch` adds the nullable `defaultBranch` column to
+  `scm_event`. It is additive and needs `db:deploy` before the API starts writing it.
+
 ## curl example
 
 ```bash
