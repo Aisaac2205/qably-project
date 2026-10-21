@@ -291,7 +291,7 @@ jobs:
           QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
         run: |
           curl --fail --silent --request POST \\
-            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions&commitSha=\${{ github.event.pull_request.head.sha || github.sha }}" \\
             --header "Authorization: Bearer $QABLY_API_KEY" \\
             --header "Content-Type: application/xml" \\
             --data-binary @./reports/junit.xml || true`,
@@ -332,7 +332,7 @@ jobs:
           QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
         run: |
           curl --fail --silent --request POST \\
-            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions&commitSha=\${{ github.event.pull_request.head.sha || github.sha }}" \\
             --header "Authorization: Bearer $QABLY_API_KEY" \\
             --header "Content-Type: application/xml" \\
             --data-binary @./reports/junit.xml || true`,
@@ -350,7 +350,7 @@ jobs:
             },
             {
               type: 'paragraph',
-              text: 'El parámetro **`externalId`** asegura idempotencia ante reintentos de CI. Al enlazarlo con identificadores provistos por el runner (como `github.run_id` y `github.job`), reintentar un job en GitHub Actions actualiza la ejecución previa en Qably en lugar de generar registros duplicados.',
+              text: 'El parámetro **`externalId`** asegura idempotencia ante reintentos de CI. Al enlazarlo con identificadores provistos por el runner (como `github.run_id` y `github.job`), reintentar un job en GitHub Actions actualiza la ejecución previa en Qably en lugar de generar registros duplicados. El parámetro **`commitSha`** permite a Qably listar los commits candidatos entre dos ejecuciones. En los pull requests la expresión usa el commit de la punta, porque `github.sha` es un commit de fusión temporal que ningún push contiene. Vea [cómo leer una regresión](/docs/regressions).',
             },
           ],
         },
@@ -977,7 +977,7 @@ response.raise_for_status()`,
               rows: [
                 ['Ejecución fallida', 'La ejecución concluye con al menos una prueba fallida.'],
                 ['Ejecución completada', 'La ejecución concluye con todas las pruebas aprobadas.'],
-                ['Caso con regresión', 'Una prueba que previamente pasaba falla en la ejecución actual.'],
+                ['Caso con regresión', 'Alguien registra a mano un resultado fallido, en una ejecución manual, para un caso que pasó en la ejecución anterior.'],
                 ['Ingesta fallida', 'Ocurre un error al procesar los cambios de código del repositorio.'],
                 ['Seguridad de la conexión', 'Se modifica el [secreto del webhook](/docs/api-webhooks) o las credenciales vinculadas al repositorio.'],
               ],

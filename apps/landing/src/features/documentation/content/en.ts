@@ -291,7 +291,7 @@ jobs:
           QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
         run: |
           curl --fail --silent --request POST \\
-            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions&commitSha=\${{ github.event.pull_request.head.sha || github.sha }}" \\
             --header "Authorization: Bearer $QABLY_API_KEY" \\
             --header "Content-Type: application/xml" \\
             --data-binary @./reports/junit.xml || true`,
@@ -332,7 +332,7 @@ jobs:
           QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
         run: |
           curl --fail --silent --request POST \\
-            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions&commitSha=\${{ github.event.pull_request.head.sha || github.sha }}" \\
             --header "Authorization: Bearer $QABLY_API_KEY" \\
             --header "Content-Type: application/xml" \\
             --data-binary @./reports/junit.xml || true`,
@@ -350,7 +350,7 @@ jobs:
             },
             {
               type: 'paragraph',
-              text: 'The **`externalId`** parameter ensures idempotency across CI retries. Linking it to runner execution identifiers (such as `github.run_id` and `github.job`) ensures re-running a failed job in GitHub Actions updates the existing run rather than creating duplicate entries.',
+              text: 'The **`externalId`** parameter ensures idempotency across CI retries. Linking it to runner execution identifiers (such as `github.run_id` and `github.job`) ensures re-running a failed job in GitHub Actions updates the existing run rather than creating duplicate entries. The **`commitSha`** parameter lets Qably list the candidate commits between two runs. On pull requests the expression uses the head commit, because `github.sha` is a temporary merge commit that no push contains. See [how to read a regression](/docs/regressions).',
             },
           ],
         },
@@ -977,7 +977,7 @@ response.raise_for_status()`,
               rows: [
                 ['Run failed', 'A test run completes with at least one failing test.'],
                 ['Run completed', 'A test run completes with all test cases passing.'],
-                ['Case regressed', 'A previously passing test fails in the current run.'],
+                ['Case regressed', 'Someone records a failing result by hand, in a manual run, for a case that passed in the previous run.'],
                 ['Ingestion failed', 'An error occurs while ingesting repository code changes.'],
                 ['Connection security', 'A [repository webhook secret](/docs/api-webhooks) or connection credential is updated.'],
               ],
