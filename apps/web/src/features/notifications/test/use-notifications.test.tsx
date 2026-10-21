@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { Notification } from '@qably/types'
 import { useNotifications } from '@/features/notifications/hooks/use-notifications'
@@ -95,5 +95,86 @@ describe('useNotifications', () => {
 
     expect(markAllRead).toHaveBeenCalled()
     await waitFor(() => expect(result.current.unreadCount).toBe(0))
+  })
+
+  it('tells a settled empty list apart from one that has not loaded yet', async () => {
+    list.mockResolvedValue([])
+    const { result } = renderHook(() => useNotifications(), { wrapper })
+
+    expect(result.current.hasLoaded).toBe(false)
+    await waitFor(() => expect(result.current.hasLoaded).toBe(true))
+    expect(result.current.notifications).toEqual([])
+  })
+})
+
+describe('useNotifications refresh', () => {
+  const visibility = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState')
+  let tabState: 'visible' | 'hidden'
+
+  function stableWrapper() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    return function StableWrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    }
+  }
+
+  function setTabState(next: 'visible' | 'hidden') {
+    tabState = next
+    window.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  beforeEach(() => {
+    tabState = 'visible'
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => tabState,
+    })
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    if (visibility) Object.defineProperty(Document.prototype, 'visibilityState', visibility)
+    Reflect.deleteProperty(document, 'visibilityState')
+  })
+
+  it('asks the api again every 30 seconds while the tab is visible', async () => {
+    renderHook(() => useNotifications(), { wrapper: stableWrapper() })
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1))
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(list).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(list).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not poll while the tab is in the background', async () => {
+    renderHook(() => useNotifications(), { wrapper: stableWrapper() })
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1))
+
+    setTabState('hidden')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(90_000)
+    })
+
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes as soon as the user comes back to the tab', async () => {
+    renderHook(() => useNotifications(), { wrapper: stableWrapper() })
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1))
+
+    setTabState('hidden')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(90_000)
+    })
+    setTabState('visible')
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
   })
 })

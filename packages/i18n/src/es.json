@@ -216,6 +216,8 @@
     "unreadBadge": "{{count}} sin leer",
     "emptyTitle": "No hay notificaciones",
     "emptyDescription": "Estás al día. Las alertas y eventos críticos aparecerán aquí.",
+    "emptyRead": "No hay notificaciones leídas",
+    "unreadState": "Sin leer",
     "viewRun": "Ver ejecución",
     "viewDetails": "Ver detalles",
     "markAsRead": "Marcar como leída",

@@ -54,6 +54,53 @@ describe('resolveNotificationLink', () => {
     expect(resolveNotificationLink(notification)).toBe('/projects/proj-1/repository')
   })
 
+  it('links proposals_ready to the review inbox filtered to its project and batch', () => {
+    const notification = baseNotification({
+      eventType: 'proposals_ready',
+      payload: { source: 'push', count: 18, projectId: 'proj-1', batchId: 'batch-7' },
+    })
+    expect(resolveNotificationLink(notification)).toBe(
+      '/review-inbox?projectId=proj-1&batch=batch-7',
+    )
+  })
+
+  it('falls back to the notification project when the proposals_ready payload has none', () => {
+    const notification = baseNotification({
+      eventType: 'proposals_ready',
+      projectId: 'proj-2',
+      payload: { source: 'chat', count: 3, batchId: 'batch-9' },
+    })
+    expect(resolveNotificationLink(notification)).toBe(
+      '/review-inbox?projectId=proj-2&batch=batch-9',
+    )
+  })
+
+  it('opens the project queue without a batch filter when the payload carries no batch', () => {
+    const notification = baseNotification({
+      eventType: 'proposals_ready',
+      payload: { source: 'documentation', count: 4, projectId: 'proj-1' },
+    })
+    expect(resolveNotificationLink(notification)).toBe('/review-inbox?projectId=proj-1')
+  })
+
+  it('encodes ids that are not URL safe in the proposals_ready link', () => {
+    const notification = baseNotification({
+      eventType: 'proposals_ready',
+      payload: { source: 'push', count: 1, projectId: 'proj 1', batchId: 'a&b=c' },
+    })
+    expect(resolveNotificationLink(notification)).toBe(
+      '/review-inbox?projectId=proj+1&batch=a%26b%3Dc',
+    )
+  })
+
+  it('has no destination for proposals_ready when no project can be resolved', () => {
+    const notification = baseNotification({
+      eventType: 'proposals_ready',
+      payload: { source: 'push', count: 18, batchId: 'batch-7' },
+    })
+    expect(resolveNotificationLink(notification)).toBeUndefined()
+  })
+
   it('has no resolvable destination for connection_security yet', () => {
     const notification = baseNotification({
       eventType: 'connection_security',

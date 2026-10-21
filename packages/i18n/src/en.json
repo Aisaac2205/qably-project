@@ -216,6 +216,8 @@
     "unreadBadge": "{{count}} unread",
     "emptyTitle": "No notifications",
     "emptyDescription": "You are all caught up. Critical alerts and events will appear here.",
+    "emptyRead": "No read notifications",
+    "unreadState": "Unread",
     "viewRun": "View run",
     "viewDetails": "View details",
     "markAsRead": "Mark as read",

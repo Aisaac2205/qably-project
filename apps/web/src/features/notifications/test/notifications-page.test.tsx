@@ -62,6 +62,7 @@ function setNotifications(notifications: Notification[]) {
     notifications,
     unreadCount: notifications.filter((n) => !n.readAt).length,
     isLoading: false,
+    hasLoaded: true,
     markAsRead,
     markAllAsRead,
   })
