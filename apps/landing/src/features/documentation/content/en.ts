@@ -37,8 +37,8 @@ export const en: DocContent = {
       sections: [
         {
           id: 'getting-started',
-          navLabel: 'Getting started',
-          title: 'Getting started',
+          navLabel: 'How Qably works',
+          title: 'How Qably works',
           blocks: [
             {
               type: 'paragraph',
@@ -358,6 +358,7 @@ jobs:
               type: 'paragraph',
               text: 'Jest and Vitest are covered in [step 4 of the quickstart](/docs/quickstart#step-4-report-ci).',
             },
+            { type: 'subheading', text: 'Commands by runner' },
             {
               type: 'codeGroup',
               label: 'Reporting JUnit XML from any language',
@@ -403,6 +404,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
                 },
               ],
             },
+            { type: 'subheading', text: 'Notes on each runner' },
             {
               type: 'paragraph',
               text: "**Playwright**'s built-in JUnit reporter writes to standard output unless a file is specified, either through an environment variable or the config file.",
@@ -427,6 +429,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
               type: 'paragraph',
               text: '`go-junit-report` reads the output of `go test`. Its `-set-exit-code` flag makes it exit with status `1` when a test fails, so a failing test still fails the CI step.',
             },
+            { type: 'subheading', text: 'Case identity and suites' },
             {
               type: 'callout',
               tone: 'warning',
@@ -456,6 +459,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
               type: 'paragraph',
               text: 'Qably derives test and suite names directly from your test runner output and file paths. The labels defined in your test code appear across the platform, turning test names into clear technical documentation for the entire team.',
             },
+            { type: 'subheading', text: 'Naming conventions' },
             {
               type: 'paragraph',
               text: 'These four conventions help produce clean, readable test suites:',
@@ -524,6 +528,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
               type: 'paragraph',
               text: 'Ingests execution results for a test suite. Authenticate using `Authorization: Bearer <project API key>`. The target project and organization are [resolved directly from the key](/docs/api-keys).',
             },
+            { type: 'subheading', text: 'Example request' },
             {
               type: 'codeGroup',
               label: 'POST /runs/ingest',
@@ -622,6 +627,7 @@ response.raise_for_status()`,
                 },
               ],
             },
+            { type: 'subheading', text: 'Request fields' },
             {
               type: 'table',
               headers: ['Field', 'Required', 'Notes'],
@@ -635,6 +641,7 @@ response.raise_for_status()`,
                 ['`cases`', 'yes', 'Array containing at least one test case.'],
               ],
             },
+            { type: 'subheading', text: 'Case fields' },
             {
               type: 'table',
               headers: ['Case field', 'Required', 'Notes'],
@@ -647,10 +654,12 @@ response.raise_for_status()`,
                 ['`recordedAt`', 'no', 'ISO 8601 timestamp with explicit time zone offset.'],
               ],
             },
+            { type: 'subheading', text: 'Run status' },
             {
               type: 'paragraph',
               text: 'Run status is determined on the server and does not trust client-calculated summaries. A single failing case marks the entire run as failed. Unresolved `pending` or `running` cases maintain the run in an executing state. A run passes only when at least one case passes or is skipped with no accompanying failures. Runs where all cases are blocked count as failed because no verifications took place.',
             },
+            { type: 'subheading', text: 'Replays and idempotency' },
             {
               type: 'paragraph',
               text: 'Submitting matching (project, `source`, `externalId`) tuples **updates the existing run** instead of duplicating records. The case list is replaced entirely, and optional metadata fields are updated when provided in subsequent payloads. The API responds with `200 OK` on both initial creation and replays.',
@@ -675,6 +684,7 @@ response.raise_for_status()`,
               type: 'paragraph',
               text: 'Allows submitting raw JUnit XML reports directly for server-side parsing. Shares identical authentication requirements with [`POST /runs/ingest`](/docs/api-ingest).',
             },
+            { type: 'subheading', text: 'Request' },
             {
               type: 'paragraph',
               text: 'The request body carries **raw XML** with `Content-Type` set to `application/xml` or `text/xml` (up to 10 MB). Additional run parameters are passed as query string arguments.',
@@ -690,6 +700,7 @@ response.raise_for_status()`,
                 ['`startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor`', 'no', 'Same fields supported by `POST /runs/ingest`.'],
               ],
             },
+            { type: 'subheading', text: 'Example request' },
             {
               type: 'code',
               language: 'shell',
@@ -700,14 +711,17 @@ response.raise_for_status()`,
   --header "Content-Type: application/xml" \\
   --data-binary @junit.xml`,
             },
+            { type: 'subheading', text: 'Response' },
             {
               type: 'paragraph',
               text: 'The endpoint answers `202 Accepted`, unlike `POST /runs/ingest`, which saves the run before it responds: the report is parsed on arrival, and each run is queued and created in the background, so a run can take a moment to appear. The response body lists `accepted` (the number of queued runs), `runs` (the `externalId`, `suiteName` and `jobId` of each one), `rejected` (the suites that failed validation, with the reason), `caseIdentityCollisions` and `truncatedFields`.',
             },
+            { type: 'subheading', text: 'One run per suite' },
             {
               type: 'paragraph',
               text: 'When the XML holds several `<testsuite name="...">` values and the request has neither `suiteId` nor `suiteName`, Qably creates one run per distinct suite name, and each run goes to the suite with that name. Every run gets its own `externalId`, derived as `<externalId>-<slug>-<hash>` (the suite name as a slug plus a short hash), so resending the same report updates the same runs. With a single suite name, the run keeps the `externalId` you sent. To keep the whole report in one run, **pass `suiteId` or `suiteName`**.',
             },
+            { type: 'subheading', text: 'Case titles and errors' },
             {
               type: 'paragraph',
               text: 'Case titles are extracted from the `<testcase name="...">` attribute, falling back to `classname` when `name` is omitted. Together, `classname` and `name` form [the case identity](/docs/other-runners). Malformed XML or empty bodies return HTTP `400`.',
@@ -732,6 +746,7 @@ response.raise_for_status()`,
               type: 'paragraph',
               text: 'GitHub is the only repository provider supported today, so the `:provider` route parameter is `github`. This route **does not use API keys**: incoming payloads are authenticated against the [HMAC secret](/docs/quickstart#step-2-connect-repository) configured for the repository connection.',
             },
+            { type: 'subheading', text: 'Headers and events' },
             {
               type: 'table',
               headers: ['', 'GitHub'],
@@ -742,6 +757,7 @@ response.raise_for_status()`,
                 ['Pull request actions handled', '`opened`, `synchronize`'],
               ],
             },
+            { type: 'subheading', text: 'Responses' },
             {
               type: 'table',
               headers: ['Response', 'Meaning'],
@@ -798,10 +814,12 @@ response.raise_for_status()`,
           navLabel: 'API keys',
           title: 'Reference: API keys',
           blocks: [
+            { type: 'subheading', text: 'Key format' },
             {
               type: 'paragraph',
               text: 'API keys use the format `qbly_<lookupId>_<secret>`. They consist of a fixed prefix, a public 6-byte lookup ID, and a 32-byte secret token. Qably stores only the SHA-256 hash and performs constant-time comparisons. The plaintext token **cannot be retrieved** once issued.',
             },
+            { type: 'subheading', text: 'Create, list and revoke' },
             {
               type: 'table',
               headers: ['Action', 'Endpoint', 'Role required'],
@@ -811,6 +829,7 @@ response.raise_for_status()`,
                 ['Revoke a key', '`POST /projects/:projectId/api-keys/:id/revoke`', 'owner or admin'],
               ],
             },
+            { type: 'subheading', text: 'Revoking and sending keys' },
             {
               type: 'paragraph',
               text: 'Revoked keys are preserved in the database to maintain attribution for past test runs. Transmit the key via `Authorization: Bearer qbly_<lookupId>_<secret>`.',
@@ -835,11 +854,19 @@ response.raise_for_status()`,
               type: 'paragraph',
               text: "Environment variables configured in CI pipelines to integrate with Qably:",
             },
+            { type: 'subheading', text: '`QABLY_API_KEY`' },
             {
               type: 'table',
               headers: ['Variable', 'Required', 'Notes'],
               rows: [
                 ['`QABLY_API_KEY`', 'yes (to submit data)', '[Project authentication key](/docs/api-keys) in CI. Unauthenticated requests return HTTP `401`.'],
+              ],
+            },
+            { type: 'subheading', text: '`QABLY_API_BASE_URL`' },
+            {
+              type: 'table',
+              headers: ['Variable', 'Required', 'Notes'],
+              rows: [
                 ['`QABLY_API_BASE_URL`', 'no', `Defaults to \`${API_BASE_URL_TOKEN}\`. Override it to test against a local API, for example \`http://localhost:3001\`.`],
               ],
             },
@@ -902,6 +929,7 @@ response.raise_for_status()`,
                 'Use the send-test action to confirm message delivery before relying on the channel.',
               ],
             },
+            { type: 'subheading', text: 'Notification events' },
             {
               type: 'table',
               headers: ['Event', 'Fires when'],
@@ -931,8 +959,8 @@ response.raise_for_status()`,
       sections: [
         {
           id: 'faq',
-          navLabel: 'Frequently asked questions',
-          title: 'Frequently asked questions',
+          navLabel: 'Sending results from CI',
+          title: 'Sending results from CI',
           blocks: [
             {
               type: 'faq',
@@ -989,6 +1017,18 @@ response.raise_for_status()`,
                     },
                   ],
                 },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'faq-repository-and-keys',
+          navLabel: 'Repository and API keys',
+          title: 'Repository and API keys',
+          blocks: [
+            {
+              type: 'faq',
+              items: [
                 {
                   question: 'Why are commits and branches missing from the project Repository section?',
                   answer: [

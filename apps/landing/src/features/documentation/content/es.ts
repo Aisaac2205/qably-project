@@ -37,8 +37,8 @@ export const es: DocContent = {
       sections: [
         {
           id: 'getting-started',
-          navLabel: 'Primeros pasos',
-          title: 'Primeros pasos',
+          navLabel: 'Cómo funciona Qably',
+          title: 'Cómo funciona Qably',
           blocks: [
             {
               type: 'paragraph',
@@ -358,6 +358,7 @@ jobs:
               type: 'paragraph',
               text: 'Jest y Vitest se detallaron en el [paso 4 del inicio rápido](/docs/quickstart#step-4-report-ci).',
             },
+            { type: 'subheading', text: 'Comandos por herramienta' },
             {
               type: 'codeGroup',
               label: 'Reportar JUnit XML desde cualquier lenguaje',
@@ -403,6 +404,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
                 },
               ],
             },
+            { type: 'subheading', text: 'Notas sobre cada herramienta' },
             {
               type: 'paragraph',
               text: 'El reporter de JUnit incorporado en **Playwright** escribe a la salida estándar a menos que se indique un archivo, ya sea mediante una variable de entorno o en el archivo de configuración.',
@@ -427,6 +429,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
               type: 'paragraph',
               text: '`go-junit-report` lee la salida de `go test`. Su bandera `-set-exit-code` hace que termine con estado `1` cuando una prueba falla, de modo que una prueba fallida sigue haciendo fallar el paso de CI.',
             },
+            { type: 'subheading', text: 'Identidad de los casos y suites' },
             {
               type: 'callout',
               tone: 'warning',
@@ -456,6 +459,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
               type: 'paragraph',
               text: 'Qably deriva los nombres de las pruebas y suites a partir de los identificadores emitidos por el ejecutor de pruebas y la estructura de archivos del repositorio. Los títulos definidos en el código se reflejan directamente en la plataforma, convirtiendo los nombres de las pruebas en documentación técnica accesible para todo el equipo.',
             },
+            { type: 'subheading', text: 'Pautas para nombrar las pruebas' },
             {
               type: 'paragraph',
               text: 'Las siguientes pautas de diseño ayudan a estructurar suites descriptivas y legibles:',
@@ -524,6 +528,7 @@ go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
               type: 'paragraph',
               text: 'Registra los resultados de ejecución de una suite de pruebas. Requiere autenticación mediante el encabezado `Authorization: Bearer <API key del proyecto>`. El proyecto y la organización [se determinan a partir de la clave](/docs/api-keys).',
             },
+            { type: 'subheading', text: 'Ejemplo de petición' },
             {
               type: 'codeGroup',
               label: 'POST /runs/ingest',
@@ -622,6 +627,7 @@ response.raise_for_status()`,
                 },
               ],
             },
+            { type: 'subheading', text: 'Campos de la petición' },
             {
               type: 'table',
               headers: ['Campo', 'Obligatorio', 'Notas'],
@@ -635,6 +641,7 @@ response.raise_for_status()`,
                 ['`cases`', 'sí', 'Arreglo con al menos un caso de prueba.'],
               ],
             },
+            { type: 'subheading', text: 'Campos de cada caso' },
             {
               type: 'table',
               headers: ['Campo del caso', 'Obligatorio', 'Notas'],
@@ -647,10 +654,12 @@ response.raise_for_status()`,
                 ['`recordedAt`', 'no', 'Marca temporal ISO 8601 con zona horaria explícita.'],
               ],
             },
+            { type: 'subheading', text: 'Estado de la ejecución' },
             {
               type: 'paragraph',
               text: 'El estado general de la ejecución se evalúa en el servidor y no depende de valores calculados por el cliente. Si un caso de prueba falla, la ejecución se marca como fallida. Si existen casos pendientes o en progreso sin fallos, la ejecución permanece en estado de ejecución. La ejecución finaliza como exitosa cuando al menos un caso concluye en `pass` o `skip`. Una ejecución donde todos los casos están bloqueados se califica como fallida, ya que ninguna validación fue completada.',
             },
+            { type: 'subheading', text: 'Reenvíos e idempotencia' },
             {
               type: 'paragraph',
               text: 'Reutilizar la combinación de proyecto, origen y `externalId` **actualiza los datos existentes** sin crear duplicados: la lista de casos se reemplaza íntegramente y los metadatos opcionales se actualizan si se incluyen en la nueva petición. El endpoint responde `200 OK` tanto en la creación inicial como en actualizaciones.',
@@ -675,6 +684,7 @@ response.raise_for_status()`,
               type: 'paragraph',
               text: 'Permite enviar archivos JUnit XML en formato original para su análisis en el servidor. Utiliza las mismas credenciales de autenticación que [`POST /runs/ingest`](/docs/api-ingest).',
             },
+            { type: 'subheading', text: 'Petición' },
             {
               type: 'paragraph',
               text: 'El cuerpo de la petición contiene el **archivo XML directo** con cabecera `Content-Type` en `application/xml` o `text/xml` (hasta 10 MB). Los parámetros de configuración se transmiten mediante la cadena de consulta (query string).',
@@ -690,6 +700,7 @@ response.raise_for_status()`,
                 ['`startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor`', 'no', 'Campos equivalentes a `POST /runs/ingest`.'],
               ],
             },
+            { type: 'subheading', text: 'Ejemplo de petición' },
             {
               type: 'code',
               language: 'shell',
@@ -700,14 +711,17 @@ response.raise_for_status()`,
   --header "Content-Type: application/xml" \\
   --data-binary @junit.xml`,
             },
+            { type: 'subheading', text: 'Respuesta' },
             {
               type: 'paragraph',
               text: 'El endpoint responde `202 Accepted`, a diferencia de `POST /runs/ingest`, que guarda la ejecución antes de responder: el reporte se analiza al recibirlo y cada ejecución se encola y se crea en segundo plano, por lo que puede tardar un momento en aparecer. El cuerpo de la respuesta incluye `accepted` (la cantidad de ejecuciones encoladas), `runs` (el `externalId`, el `suiteName` y el `jobId` de cada una), `rejected` (las suites que no pasaron la validación, con el motivo), `caseIdentityCollisions` y `truncatedFields`.',
             },
+            { type: 'subheading', text: 'Una ejecución por suite' },
             {
               type: 'paragraph',
               text: 'Cuando el XML contiene varios valores de `<testsuite name="...">` y la petición no incluye `suiteId` ni `suiteName`, Qably crea una ejecución por cada nombre de suite distinto, y cada ejecución se asigna a la suite con ese nombre. Cada ejecución recibe su propio `externalId`, derivado como `<externalId>-<slug>-<hash>` (el nombre de la suite como slug más un hash corto), de modo que reenviar el mismo reporte actualiza las mismas ejecuciones. Si el XML tiene un solo nombre de suite, la ejecución conserva el `externalId` enviado. Para mantener todo el reporte en una sola ejecución, **indique `suiteId` o `suiteName`**.',
             },
+            { type: 'subheading', text: 'Títulos de los casos y errores' },
             {
               type: 'paragraph',
               text: 'El título de cada caso se extrae del atributo `name` en `<testcase>`, y se usa `classname` como valor de respaldo si `name` está ausente. Juntos, `classname` y `name` forman [la identidad del caso](/docs/other-runners). Los archivos con sintaxis XML inválida o cuerpos vacíos reciben una respuesta HTTP `400`.',
@@ -732,6 +746,7 @@ response.raise_for_status()`,
               type: 'paragraph',
               text: 'GitHub es el único proveedor de repositorios compatible actualmente, por lo que el parámetro `:provider` es `github`. Este endpoint **no utiliza API keys**: cada entrega se valida mediante el [secreto HMAC](/docs/quickstart#step-2-connect-repository) configurado para la conexión del repositorio.',
             },
+            { type: 'subheading', text: 'Encabezados y eventos' },
             {
               type: 'table',
               headers: ['', 'GitHub'],
@@ -742,6 +757,7 @@ response.raise_for_status()`,
                 ['Acciones de pull request manejadas', '`opened`, `synchronize`'],
               ],
             },
+            { type: 'subheading', text: 'Respuestas' },
             {
               type: 'table',
               headers: ['Respuesta', 'Significado'],
@@ -798,10 +814,12 @@ response.raise_for_status()`,
           navLabel: 'API keys',
           title: 'Referencia: API keys',
           blocks: [
+            { type: 'subheading', text: 'Formato de la clave' },
             {
               type: 'paragraph',
               text: 'Las claves siguen la estructura `qbly_<lookupId>_<secret>`. Incorporan un prefijo constante, un identificador público de 6 bytes para ubicar el registro y un secreto criptográfico de 32 bytes para la autenticación. Qably almacena únicamente el hash SHA-256 y realiza comprobaciones en tiempo constante. El token en texto plano **no puede recuperarse** tras su emisión.',
             },
+            { type: 'subheading', text: 'Crear, listar y revocar' },
             {
               type: 'table',
               headers: ['Acción', 'Endpoint', 'Rol requerido'],
@@ -811,6 +829,7 @@ response.raise_for_status()`,
                 ['Revocar una key', '`POST /projects/:projectId/api-keys/:id/revoke`', 'owner o admin'],
               ],
             },
+            { type: 'subheading', text: 'Revocación y uso de las claves' },
             {
               type: 'paragraph',
               text: 'Las claves revocadas permanecen archivadas en el sistema para conservar la trazabilidad de las ejecuciones históricas. Se envían en el encabezado `Authorization: Bearer qbly_<lookupId>_<secret>`.',
@@ -835,11 +854,19 @@ response.raise_for_status()`,
               type: 'paragraph',
               text: 'Variables requeridas en los entornos de CI para la integración con Qably:',
             },
+            { type: 'subheading', text: '`QABLY_API_KEY`' },
             {
               type: 'table',
               headers: ['Variable', 'Obligatoria', 'Notas'],
               rows: [
                 ['`QABLY_API_KEY`', 'sí (para reportar datos)', '[Clave de autenticación del proyecto](/docs/api-keys) en CI. Si no está configurada, las peticiones sin autenticar se rechazan con código `401`.'],
+              ],
+            },
+            { type: 'subheading', text: '`QABLY_API_BASE_URL`' },
+            {
+              type: 'table',
+              headers: ['Variable', 'Obligatoria', 'Notas'],
+              rows: [
                 ['`QABLY_API_BASE_URL`', 'no', `Por defecto apunta a \`${API_BASE_URL_TOKEN}\`. Puede configurarse para probar contra una API local, por ejemplo \`http://localhost:3001\`.`],
               ],
             },
@@ -902,6 +929,7 @@ response.raise_for_status()`,
                 'Utilice la opción de envío de prueba para verificar la recepción del mensaje antes de activar el canal.',
               ],
             },
+            { type: 'subheading', text: 'Eventos de notificación' },
             {
               type: 'table',
               headers: ['Evento', 'Se dispara cuando'],
@@ -931,8 +959,8 @@ response.raise_for_status()`,
       sections: [
         {
           id: 'faq',
-          navLabel: 'Preguntas frecuentes',
-          title: 'Preguntas frecuentes',
+          navLabel: 'Envío de resultados desde CI',
+          title: 'Envío de resultados desde CI',
           blocks: [
             {
               type: 'faq',
@@ -989,6 +1017,18 @@ response.raise_for_status()`,
                     },
                   ],
                 },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'faq-repository-and-keys',
+          navLabel: 'Repositorio y API keys',
+          title: 'Repositorio y API keys',
+          blocks: [
+            {
+              type: 'faq',
+              items: [
                 {
                   question: '¿Por qué la sección Repository del proyecto no muestra commits ni ramas?',
                   answer: [

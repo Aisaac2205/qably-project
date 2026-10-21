@@ -3,6 +3,7 @@ import { forEachProse, walkBlocks } from '../lib/content-walk';
 import { validateDiagram } from '../lib/diagram';
 import { collectInlineLinks, parseInline, stripInline, type InlineNode } from '../lib/inline';
 import { getAllSections } from '../lib/pages';
+import { buildPageToc, hasPageToc } from '../lib/toc';
 import { en } from './en';
 import { es } from './es';
 import type { CodeGroupBlock, DiagramBlock, DocBlock, DocContent } from './types';
@@ -626,5 +627,58 @@ describe('documentation text style', () => {
         }
       }
     }
+  });
+});
+
+describe('documentation structure', () => {
+  it.each(locales)('$name gives every page a table of contents of at least two entries', ({ content }) => {
+    for (const page of content.pages) {
+      const entries = buildPageToc(page);
+
+      expect(hasPageToc(entries), `"${page.slug}" has ${entries.length} table of contents entries`).toBe(true);
+    }
+  });
+
+  it('en and es split every section into the same kinds of blocks, in the same order', () => {
+    const shape = (content: DocContent) =>
+      content.pages.map((page) => ({
+        slug: page.slug,
+        sections: page.sections.map((section) => ({
+          id: section.id,
+          blocks: section.blocks.map((block) =>
+            block.type === 'faq' ? `faq:${block.items.map((item) => item.answer.length).join(',')}` : block.type,
+          ),
+        })),
+      }));
+
+    expect(shape(es)).toEqual(shape(en));
+  });
+
+  it.each(locales)('$name never titles a page or a section like the sidebar group that holds it', ({ content }) => {
+    for (const group of content.navGroups) {
+      for (const slug of group.pageSlugs) {
+        const page = content.pages.find((candidate) => candidate.slug === slug)!;
+
+        expect(page.title, `title of "${slug}"`).not.toBe(group.label);
+        expect(page.navLabel, `nav label of "${slug}"`).not.toBe(group.label);
+
+        for (const section of page.sections) {
+          expect(section.title, `title of "${slug}#${section.id}"`).not.toBe(group.label);
+          expect(section.navLabel, `nav label of "${slug}#${section.id}"`).not.toBe(group.label);
+        }
+      }
+    }
+  });
+
+  it.each(locales)('$name keeps subheadings to words and code: no link inside a heading', ({ content }) => {
+    forEachProse(content, (text, where) => {
+      if (where.endsWith(' subheading')) expect(linkTargets(text), `links at ${where}`).toEqual([]);
+    });
+  });
+
+  it.each(locales)('$name keeps the anchor of the overview section that old links point to', ({ content }) => {
+    const overview = content.pages.find((page) => page.slug === 'overview')!;
+
+    expect(overview.sections.map((section) => section.id)).toContain('getting-started');
   });
 });
