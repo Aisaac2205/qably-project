@@ -52,6 +52,12 @@
      heading counts as reached: the 4rem fixed header plus 2rem of air. Anchor
      jumps (scroll-margin), the pinned rails and the scroll spy share it. */
   --docs-scroll-offset:    6rem;
+
+  /* Documentation reader columns: the left navigation, the right contents list
+     and the article between them (the article never grows past its width). */
+  --docs-sidebar-width:    16rem;
+  --docs-toc-width:        14rem;
+  --docs-article-width:    48rem;
 }
 
 /* ─── Product app tokens (dashboard preview only) ───────────────────────
@@ -161,8 +167,19 @@
 
   --container-dashboard: 1128px;
 
-  /* Documentation reader: spacing key `docs-offset` (scroll-mt-docs-offset, top-docs-offset). */
+  /* Documentation reader. Spacing key `docs-offset` (scroll-mt-docs-offset,
+     top-docs-offset) and `docs-rail`, the tallest a pinned rail may be: what is
+     left of the viewport below the offset, with 1rem of air at the bottom. Size
+     keys `docs-sidebar`, `docs-toc` and `docs-article` (w-docs-sidebar, ...). */
   --spacing-docs-offset: var(--docs-scroll-offset);
+  --spacing-docs-rail: calc(100dvh - var(--docs-scroll-offset) - 1rem);
+  --container-docs-sidebar: var(--docs-sidebar-width);
+  --container-docs-toc: var(--docs-toc-width);
+  --container-docs-article: var(--docs-article-width);
+
+  /* Inline code is set relative to the text around it, so it never outgrows a
+     table cell or a diagram label (text-inline-code). */
+  --text-inline-code: 0.875em;
 
   --color-bg:          var(--landing-bg);
   --color-bg-elevated: var(--landing-bg-elevated);

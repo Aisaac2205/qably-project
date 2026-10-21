@@ -76,6 +76,15 @@ describe('docs components: safety and determinism', () => {
   });
 });
 
+describe('tables', () => {
+  it('scroll inside their own box on a phone instead of crushing their columns', () => {
+    const blocks = component('DocsBlocks.astro');
+
+    expect(blocks).toContain('overflow-x-auto rounded-xl border border-border');
+    expect(blocks).toMatch(/<table class="[^"]*min-w-lg/);
+  });
+});
+
 describe('the callout', () => {
   const callout = readAstroComponents().find((file) => file.name === 'Callout.astro');
 
@@ -124,5 +133,117 @@ describe('the tab strip of a code group', () => {
 
   it('takes its id from the page, not from a random value', () => {
     expect(group?.source).toContain('groupId');
+  });
+});
+
+function component(name: string): string {
+  const file = readComponents().find((candidate) => candidate.name === name);
+
+  if (file === undefined) throw new Error(`missing docs component ${name}`);
+
+  return file.source;
+}
+
+describe('the rails, the navigation and the contents list', () => {
+  const globalCss = readFileSync(path.resolve(here, '../../../styles/global.css'), 'utf-8');
+
+  it('sizes both rails from tokens, never from a fixed width', () => {
+    expect(globalCss).toContain('--docs-sidebar-width');
+    expect(globalCss).toContain('--docs-toc-width');
+    expect(component('DocsSidebar.astro')).toContain('w-docs-sidebar');
+    expect(component('DocsToc.astro')).toContain('w-docs-toc');
+    expect(component('DocsPage.astro')).not.toMatch(/\bw-(?:56|64)\b/);
+  });
+
+  it('keeps the page free of a global style block: the pinned rails are plain utilities', () => {
+    expect(component('DocsPage.astro')).not.toContain('<style');
+
+    for (const name of ['DocsSidebar.astro', 'DocsToc.astro']) {
+      expect(component(name), name).toMatch(/sticky[^"]*top-docs-offset|top-docs-offset[^"]*sticky/);
+      expect(component(name), name).toContain('max-h-docs-rail');
+    }
+  });
+
+  it('stretches the contents column to the height of the article so its pinned list can travel', () => {
+    expect(component('DocsToc.astro')).toMatch(/w-docs-toc[^"]*self-stretch/);
+  });
+
+  it('marks the current page with a soft filled pill and aria-current', () => {
+    const list = component('DocsNavList.astro');
+
+    expect(list).toContain("'page'");
+    expect(list).toContain('aria-current');
+    expect(list).toContain('bg-bg-elevated text-fg');
+    expect(list).toMatch(/text-sm font-semibold text-fg/);
+  });
+
+  it('gives the rows of the collapsible menu a 44px touch target', () => {
+    expect(component('DocsMobileNav.astro')).toContain('min-h-11');
+    expect(component('DocsNavList.astro')).toContain('min-h-11');
+    expect(component('DocsTocList.astro')).toContain('min-h-11');
+  });
+
+  it('titles the contents list with a Phosphor List icon', () => {
+    const toc = component('DocsToc.astro');
+
+    expect(toc).toMatch(/import \{[^}]*\bList\b[^}]*\} from '@phosphor-icons\/react'/);
+    expect(toc).toContain('aria-hidden="true"');
+  });
+
+  it('marks the entry being read with a 2px rule and the full foreground', () => {
+    const list = component('DocsTocList.astro');
+
+    expect(list).toContain('border-l-2');
+    expect(list).toContain('data-active:border-primary');
+    expect(list).toContain('data-active:text-fg');
+    expect(list).toContain('text-fg-muted');
+    expect(list).not.toContain('data-active:font-');
+  });
+
+  it('only animates colour, and not under prefers-reduced-motion', () => {
+    for (const name of ['DocsNavList.astro', 'DocsTocList.astro', 'DocsPager.astro']) {
+      const source = component(name);
+
+      expect(source, name).toContain('transition-colors');
+      expect(source, name).toContain('motion-reduce:transition-none');
+      expect(source, name).not.toMatch(/transition-(?:all|transform)/);
+    }
+  });
+
+  it('brightens the border and the title of a pager card on hover', () => {
+    const pager = component('DocsPager.astro');
+
+    expect(pager).toContain('hover:border-border-strong');
+    expect(pager).toContain('group-hover:text-fg');
+  });
+});
+
+describe('the diagram', () => {
+  it('is a figure with a visible caption and a purely visual drawing', () => {
+    const diagram = component('Diagram.astro');
+
+    expect(diagram).toContain('<figure');
+    expect(diagram).toContain('<figcaption');
+    expect(diagram).toContain('aria-hidden="true"');
+  });
+
+  it('carries the same data as an ordered list for assistive technology', () => {
+    const diagram = component('Diagram.astro');
+
+    expect(diagram).toMatch(/<div class="sr-only">/);
+    expect(diagram).toContain('<ol');
+    expect(diagram).toContain('describeDiagramSteps');
+  });
+
+  it('draws lanes as dashed boxes and flows in a row from md, in a column on phones', () => {
+    const diagram = component('Diagram.astro');
+
+    expect(diagram).toContain('border-dashed');
+    expect(diagram).toContain('md:flex-row');
+    expect(diagram).toContain('flex-col');
+  });
+
+  it('is rendered for the diagram block', () => {
+    expect(component('DocsBlocks.astro')).toContain("block.type === 'diagram'");
   });
 });

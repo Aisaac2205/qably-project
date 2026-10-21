@@ -3,6 +3,7 @@ import type { DocBlock } from '../content/types';
 import Callout from './Callout.astro';
 import CodeBlock from './CodeBlock.astro';
 import CodeGroup from './CodeGroup.astro';
+import Diagram from './Diagram.astro';
 import type { DocsRenderContext } from '../lib/render-context';
 import { subheadingId } from '../lib/toc';
 import DocsBlocks from './DocsBlocks.astro';
@@ -94,7 +95,8 @@ const Subheading = subheadingLevel === 2 ? 'h2' : 'h3';
 
       {block.type === 'table' && (
         <div class="overflow-x-auto rounded-xl border border-border">
-          <table class="w-full text-left text-sm leading-6">
+          {/* min-w-lg: on a phone the table scrolls inside its box instead of crushing its columns. */}
+          <table class="w-full min-w-lg text-left text-sm leading-6">
             <thead>
               <tr class="border-b border-border">
                 {block.headers.map((header) => (
@@ -120,6 +122,8 @@ const Subheading = subheadingLevel === 2 ? 'h2' : 'h3';
       )}
 
       {block.type === 'callout' && <Callout tone={block.tone} text={block.text} ctx={ctx} />}
+
+      {block.type === 'diagram' && <Diagram block={block} ctx={ctx} />}
 
       {block.type === 'logoRow' && (
         <div class="flex flex-wrap gap-3">

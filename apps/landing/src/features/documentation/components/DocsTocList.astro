@@ -3,17 +3,23 @@ import type { TocEntry } from '../lib/toc';
 
 interface Props {
   entries: TocEntry[];
+  /** Rows at least 44px tall, for the collapsible list that is used with a finger. */
+  touch?: boolean;
 }
 
-const { entries } = Astro.props;
+const { entries, touch = false } = Astro.props;
 ---
 
-{/*
-  data-toc-link carries the id of the heading it points to; the script in
-  DocsInteractions marks the link of the section being read with data-active
-  and aria-current="location".
-*/}
-<ul class="space-y-0.5">
+{
+  /*
+    data-toc-link carries the id of the heading it points to; the script in
+    DocsInteractions marks the link of the section being read with data-active
+    and aria-current="location". The entry being read gets the full foreground
+    and a 2px rule over the 1px track of the list; its weight never changes, so
+    the line breaks do not move while the reader scrolls.
+  */
+}
+<ul class="border-l border-border">
   {
     entries.map((entry) => (
       <li>
@@ -22,9 +28,9 @@ const { entries } = Astro.props;
           data-toc-link={entry.id}
           data-toc-level={entry.level}
           class:list={[
-            'block rounded-md py-1.5 pr-2 text-sm leading-snug text-fg-muted transition-colors',
-            'hover:text-fg data-active:font-medium data-active:text-fg',
-            entry.level === 3 ? 'pl-5' : 'pl-2',
+            '-ml-px border-l-2 border-transparent text-sm leading-snug text-fg-muted transition-colors duration-150 ease-out hover:text-fg data-active:border-primary data-active:text-fg motion-reduce:transition-none',
+            touch ? 'flex min-h-11 items-center py-2 pr-3' : 'block py-1.5 pr-2',
+            entry.level === 3 ? 'pl-6' : 'pl-3',
           ]}
         >
           {entry.label}

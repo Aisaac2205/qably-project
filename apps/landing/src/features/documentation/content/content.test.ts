@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { walkBlocks } from '../lib/content-walk';
+import { validateDiagram } from '../lib/diagram';
 import { stripInline } from '../lib/inline';
 import { getAllSections } from '../lib/pages';
 import { en } from './en';
 import { es } from './es';
-import type { CodeGroupBlock, DocBlock, DocContent } from './types';
+import type { CodeGroupBlock, DiagramBlock, DocBlock, DocContent } from './types';
 
 const locales: { name: string; content: DocContent }[] = [
   { name: 'en', content: en },
@@ -35,6 +37,18 @@ function collectBlockText(block: DocBlock, parts: string[]): void {
       break;
     case 'logoRow':
       for (const item of block.items) parts.push(item.alt, item.label);
+      break;
+    case 'diagram':
+      parts.push(block.title, block.description);
+      if (block.caption !== undefined) parts.push(stripInline(block.caption));
+      for (const group of block.groups ?? []) parts.push(group.label);
+      for (const node of block.nodes) {
+        parts.push(node.label);
+        if (node.detail !== undefined) parts.push(stripInline(node.detail));
+      }
+      for (const edge of block.edges ?? []) {
+        if (edge.label !== undefined) parts.push(edge.label);
+      }
       break;
     case 'faq':
       for (const item of block.items) {
@@ -175,11 +189,70 @@ function findAsciiWordMatch(haystack: string, word: string): string | undefined 
 
 const MAX_DESCRIPTION_LENGTH = 160;
 
+function collectDiagrams(content: DocContent): { where: string; diagram: DiagramBlock }[] {
+  return [...walkBlocks(content)].flatMap(({ block, where }) =>
+    block.type === 'diagram' ? [{ where, diagram: block }] : [],
+  );
+}
+
+describe('documentation diagrams', () => {
+  it.each(locales)('$name every diagram is well formed: known ids, a linear flow, contiguous lanes', ({ content }) => {
+    for (const { where, diagram } of collectDiagrams(content)) {
+      expect(validateDiagram(diagram), `diagram at ${where}`).toEqual([]);
+    }
+  });
+
+  it.each(locales)('$name every edge and node group points to a node or group that exists', ({ content }) => {
+    for (const { where, diagram } of collectDiagrams(content)) {
+      const nodeIds = new Set(diagram.nodes.map((node) => node.id));
+      const groupIds = new Set((diagram.groups ?? []).map((group) => group.id));
+
+      for (const edge of diagram.edges ?? []) {
+        expect(nodeIds.has(edge.from), `${where}: edge from "${edge.from}"`).toBe(true);
+        expect(nodeIds.has(edge.to), `${where}: edge to "${edge.to}"`).toBe(true);
+      }
+
+      for (const node of diagram.nodes) {
+        if (node.group !== undefined) expect(groupIds.has(node.group), `${where}: group "${node.group}"`).toBe(true);
+      }
+    }
+  });
+
+  it.each(locales)('$name every diagram has a title and a text alternative', ({ content }) => {
+    for (const { where, diagram } of collectDiagrams(content)) {
+      expect(diagram.title.trim().length, `title at ${where}`).toBeGreaterThan(0);
+      expect(diagram.description.trim().length, `description at ${where}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('en and es draw the same diagrams: same places, same nodes, same lanes, same edges', () => {
+    const shape = (diagram: DiagramBlock) => ({
+      nodes: diagram.nodes.map((node) => [node.id, node.group ?? null]),
+      groups: (diagram.groups ?? []).map((group) => [group.id, group.tone ?? 'external']),
+      edges: (diagram.edges ?? []).map((edge) => [edge.from, edge.to]),
+    });
+    const enDiagrams = collectDiagrams(en);
+    const esDiagrams = collectDiagrams(es);
+
+    expect(esDiagrams.map((entry) => entry.where)).toEqual(enDiagrams.map((entry) => entry.where));
+
+    for (const [index, entry] of enDiagrams.entries()) {
+      expect(shape(esDiagrams[index]!.diagram), `diagram at ${entry.where}`).toEqual(shape(entry.diagram));
+    }
+  });
+});
+
 describe('documentation content', () => {
   it.each(locales)('$name has a non-empty UI label for every kind of callout', ({ content }) => {
     expect(content.labels.calloutInfo.trim().length).toBeGreaterThan(0);
     expect(content.labels.calloutWarning.trim().length).toBeGreaterThan(0);
     expect(content.labels.calloutInfo).not.toBe(content.labels.calloutWarning);
+  });
+
+  it.each(locales)('$name has every UI label non-empty', ({ content }) => {
+    for (const [key, value] of Object.entries(content.labels)) {
+      expect(value.trim().length, `label "${key}"`).toBeGreaterThan(0);
+    }
   });
 
   it('en and es define the same UI labels, and translate them', () => {

@@ -100,6 +100,27 @@ describe('forEachProse', () => {
     ]);
   });
 
+  it('visits the caption and the node details of a diagram, which are inline text', () => {
+    const content = contentWith([
+      {
+        type: 'diagram',
+        title: 'title is plain',
+        description: 'description is plain',
+        caption: 'caption',
+        nodes: [
+          { id: 'a', label: 'label is plain', detail: 'detail a' },
+          { id: 'b', label: 'B' },
+          { id: 'c', label: 'C', detail: 'detail c' },
+        ],
+      },
+    ]);
+    const seen: string[] = [];
+
+    forEachProse(content, (value) => seen.push(value));
+
+    expect(seen).toEqual(['caption', 'detail a', 'detail c']);
+  });
+
   it('never visits code, which is verbatim and not parsed', () => {
     const content = contentWith([
       { type: 'code', language: 'shell', code: 'echo **not markup**' },

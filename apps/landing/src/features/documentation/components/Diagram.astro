@@ -1,0 +1,118 @@
+---
+import { ArrowDown, ArrowRight } from '@phosphor-icons/react';
+import type { DiagramBlock } from '../content/types';
+import { buildDiagramLayout, describeDiagramSteps } from '../lib/diagram';
+import { stripInline } from '../lib/inline';
+import type { DocsRenderContext } from '../lib/render-context';
+import Inline from './Inline.astro';
+
+interface Props {
+  block: DiagramBlock;
+  ctx: DocsRenderContext;
+}
+
+const { block, ctx } = Astro.props;
+
+// An invalid diagram (unknown ids, a split lane, a loop) fails the build here.
+const layout = buildDiagramLayout(block);
+const steps = describeDiagramSteps(layout);
+
+// connectors[i] joins order[i] to order[i + 1]; a node is followed by the connector at its index.
+const connectorAfter = new Map(layout.connectors.map((connector) => [connector.from, connector]));
+const lastNodeOfLane = (laneIndex: number) => layout.lanes[laneIndex]!.nodes.at(-1)!;
+
+const laneBorder = {
+  external: 'border-border',
+  qably: 'border-border-strong',
+};
+---
+
+{
+  /*
+    A flow drawn from data in the palette of the page: tokens only, no motion.
+    Lanes are dashed boxes; the nodes inside a lane run in a row from md and in a
+    column on phones, and the lanes stack, so nothing ever scrolls sideways. The
+    drawing is aria-hidden: the same data is read as an ordered list instead.
+  */
+}
+<figure class="space-y-3">
+  <div aria-hidden="true">
+    {
+      layout.lanes.map((lane, laneIndex) => (
+        <Fragment>
+          {laneIndex > 0 && (
+            <div class="flex items-center justify-center gap-2 py-2 text-fg-subtle">
+              <span aria-hidden="true"><ArrowDown size={16} /></span>
+              {connectorAfter.get(lastNodeOfLane(laneIndex - 1).id)?.label && (
+                <span class="text-xs">{connectorAfter.get(lastNodeOfLane(laneIndex - 1).id)?.label}</span>
+              )}
+            </div>
+          )}
+
+          <div
+            class:list={[
+              lane.group !== null && 'rounded-xl border border-dashed p-3 sm:p-4',
+              lane.group !== null && laneBorder[lane.tone],
+            ]}
+          >
+            {lane.group !== null && <p class="mb-3 text-sm font-semibold text-fg">{lane.group.label}</p>}
+
+            <div class="flex flex-col items-stretch gap-1 md:flex-row md:gap-2">
+              {lane.nodes.map((node, nodeIndex) => (
+                <Fragment>
+                  {nodeIndex > 0 && (
+                    <div class="flex shrink-0 items-center justify-center gap-2 py-1 text-fg-subtle md:flex-col md:gap-1 md:px-1 md:py-0">
+                      <span aria-hidden="true" class="md:hidden"><ArrowDown size={16} /></span>
+                      <span aria-hidden="true" class="hidden md:block"><ArrowRight size={16} /></span>
+                      {connectorAfter.get(lane.nodes[nodeIndex - 1]!.id)?.label && (
+                        <span class="text-xs md:max-w-24 md:text-center">
+                          {connectorAfter.get(lane.nodes[nodeIndex - 1]!.id)?.label}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div class="min-w-0 flex-1 rounded-lg border border-border bg-bg-elevated px-3 py-2.5">
+                    <p class="text-sm font-medium text-fg">{node.label}</p>
+                    {node.detail !== undefined && (
+                      <p class="mt-1 text-xs leading-5 text-fg-muted">
+                        <Inline text={node.detail} ctx={ctx} />
+                      </p>
+                    )}
+                  </div>
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        </Fragment>
+      ))
+    }
+  </div>
+
+  <div class="sr-only">
+    <p>{block.description}</p>
+    <ol>
+      {
+        steps.map((step) => (
+          <li>
+            {step.lane !== null && `${step.lane.label}: `}
+            {step.node.label}
+            {step.node.detail !== undefined && ` - ${stripInline(step.node.detail)}`}
+            {step.next?.label !== undefined && `. ${ctx.labels.diagramNextLabel}: ${step.next.label}`}
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+
+  <figcaption class="max-w-prose text-sm leading-6 text-fg-muted">
+    <strong class="font-semibold text-fg">{ctx.labels.diagramLabel}: {block.title}</strong>
+    {
+      block.caption !== undefined && (
+        <span class="mt-1 block">
+          <Inline text={block.caption} ctx={ctx} />
+        </span>
+      )
+    }
+  </figcaption>
+</figure>

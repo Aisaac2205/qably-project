@@ -135,6 +135,95 @@ describe('resolveDocContent', () => {
     expect(resolved.pages[0]!.sections[0]!.blocks[0]).toMatchObject({ text: 'No token here.' });
   });
 
+  it('replaces the token in every text of a diagram', () => {
+    const content = buildContent();
+    const withDiagram: DocContent = {
+      ...content,
+      pages: [
+        {
+          ...content.pages[0]!,
+          sections: [
+            {
+              ...content.pages[0]!.sections[0]!,
+              blocks: [
+                {
+                  type: 'diagram',
+                  title: `Reports to ${API_BASE_URL_TOKEN}`,
+                  description: `The CI posts to ${API_BASE_URL_TOKEN}/runs/ingest.`,
+                  caption: `See ${API_BASE_URL_TOKEN}`,
+                  groups: [{ id: 'ci', label: `CI of ${API_BASE_URL_TOKEN}` }],
+                  nodes: [
+                    { id: 'a', label: `A ${API_BASE_URL_TOKEN}`, detail: `POST ${API_BASE_URL_TOKEN}/runs`, group: 'ci' },
+                    { id: 'b', label: 'B', group: 'ci' },
+                  ],
+                  edges: [{ from: 'a', to: 'b', label: `via ${API_BASE_URL_TOKEN}` }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      navGroups: [{ label: 'Reference', pageSlugs: ['reference'] }],
+    };
+
+    const resolved = resolveDocContent(withDiagram, 'https://api.qably.dev');
+
+    expect(resolved.pages[0]!.sections[0]!.blocks[0]).toEqual({
+      type: 'diagram',
+      title: 'Reports to https://api.qably.dev',
+      description: 'The CI posts to https://api.qably.dev/runs/ingest.',
+      caption: 'See https://api.qably.dev',
+      groups: [{ id: 'ci', label: 'CI of https://api.qably.dev' }],
+      nodes: [
+        { id: 'a', label: 'A https://api.qably.dev', detail: 'POST https://api.qably.dev/runs', group: 'ci' },
+        { id: 'b', label: 'B', group: 'ci' },
+      ],
+      edges: [{ from: 'a', to: 'b', label: 'via https://api.qably.dev' }],
+    });
+  });
+
+  it('keeps the ids of a diagram, which its edges and lanes depend on, and leaves optional fields absent', () => {
+    const content = buildContent();
+    const bare: DocContent = {
+      ...content,
+      pages: [
+        {
+          ...content.pages[0]!,
+          sections: [
+            {
+              ...content.pages[0]!.sections[0]!,
+              blocks: [
+                {
+                  type: 'diagram',
+                  title: 'T',
+                  description: 'D',
+                  nodes: [
+                    { id: API_BASE_URL_TOKEN, label: 'A' },
+                    { id: 'b', label: 'B' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      navGroups: [{ label: 'Reference', pageSlugs: ['reference'] }],
+    };
+
+    const resolved = resolveDocContent(bare, 'https://api.qably.dev');
+    const block = resolved.pages[0]!.sections[0]!.blocks[0] as {
+      nodes: { id: string }[];
+      caption?: string;
+      groups?: unknown;
+      edges?: unknown;
+    };
+
+    expect(block.nodes[0]!.id).toBe(API_BASE_URL_TOKEN);
+    expect('caption' in block).toBe(false);
+    expect('groups' in block).toBe(false);
+    expect('edges' in block).toBe(false);
+  });
+
   it('replaces the token inside inline markup, so a link target built on it becomes a real external link', () => {
     const content = buildContent();
     const withMarkup: DocContent = {

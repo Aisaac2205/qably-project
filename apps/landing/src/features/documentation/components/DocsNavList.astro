@@ -9,9 +9,11 @@ interface Props {
   currentSlug: string;
   /** Keeps the heading ids unique when the list is rendered more than once. */
   idPrefix: string;
+  /** Rows at least 44px tall, for the collapsible menu that is used with a finger. */
+  touch?: boolean;
 }
 
-const { content, locale, currentSlug, idPrefix } = Astro.props;
+const { content, locale, currentSlug, idPrefix, touch = false } = Astro.props;
 
 const groups = content.navGroups.map((group, index) => ({
   headingId: `${idPrefix}-group-${index}`,
@@ -24,14 +26,21 @@ const groups = content.navGroups.map((group, index) => ({
 }));
 ---
 
-<ul class="space-y-6">
+{
+  /*
+    Group headings in bold, pages muted; the page being read is a soft filled
+    pill with the full foreground. Colour is the only thing that changes on
+    hover, and focus keeps the global focus ring.
+  */
+}
+<ul class="space-y-7">
   {
     groups.map((group) => (
       <li>
-        <p id={group.headingId} class="px-2 text-sm font-semibold text-fg">
+        <p id={group.headingId} class="px-3 text-sm font-semibold text-fg">
           {group.label}
         </p>
-        <ul aria-labelledby={group.headingId} class="mt-1.5 space-y-0.5">
+        <ul aria-labelledby={group.headingId} class="mt-2 space-y-0.5">
           {group.pages.map((page) => {
             const isCurrent = page.slug === currentSlug;
 
@@ -41,10 +50,9 @@ const groups = content.navGroups.map((group, index) => ({
                   href={docsPagePath(locale, page.slug)}
                   aria-current={isCurrent ? 'page' : undefined}
                   class:list={[
-                    'block rounded-md px-2 py-1.5 text-sm leading-snug transition-colors',
-                    isCurrent
-                      ? 'bg-bg-elevated font-medium text-fg'
-                      : 'text-fg-muted hover:bg-bg-elevated hover:text-fg',
+                    'rounded-lg px-3 text-sm leading-snug transition-colors duration-150 ease-out motion-reduce:transition-none',
+                    touch ? 'flex min-h-11 items-center' : 'block py-1.5',
+                    isCurrent ? 'bg-bg-elevated text-fg' : 'text-fg-muted hover:text-fg',
                   ]}
                 >
                   {page.navLabel}

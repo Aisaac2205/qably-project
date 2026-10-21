@@ -45,7 +45,7 @@ const alternateLocale: Locale = locale === 'en' ? 'es' : 'en';
   >
     <DocsSidebar content={content} locale={locale} currentSlug={slug} />
 
-    <div class="min-w-0 max-w-3xl flex-1">
+    <div class="min-w-0 max-w-docs-article flex-1">
       <DocsMobileNav content={content} locale={locale} currentSlug={slug} entries={tocEntries} showToc={showToc} />
       <DocsArticle content={content} locale={locale} page={page} groupLabel={group?.label} />
     </div>
@@ -57,27 +57,3 @@ const alternateLocale: Locale = locale === 'en' ? 'es' : 'en';
 
   <Footer locale={locale} />
 </Landing>
-
-<style is:global>
-  /*
-    Side rails stay in view while the article scrolls: pinned 6rem from the top
-    (below the 4rem fixed header, with 2rem of air) and never taller than what
-    is left of the viewport, scrolling on their own when the list is longer.
-  */
-  .docs-rail {
-    position: sticky;
-    top: 6rem;
-    max-height: calc(100dvh - 7rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  /* Safari still draws its own marker on a <summary> that is not display: list-item. */
-  .docs-disclosure > summary {
-    list-style: none;
-  }
-
-  .docs-disclosure > summary::-webkit-details-marker {
-    display: none;
-  }
-</style>

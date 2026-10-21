@@ -58,6 +58,57 @@ export interface LogoRowBlock {
   items: LogoRowItem[];
 }
 
+/**
+ * A lane of a diagram: a labelled box that holds a run of consecutive nodes
+ * (the actors: "Your CI", "Qably"). `external` lanes are drawn with the plain
+ * hairline, `qably` lanes with the stronger one; a lane without a tone is external.
+ */
+export interface DiagramGroup {
+  id: string;
+  label: string;
+  tone?: 'external' | 'qably';
+}
+
+export interface DiagramNode {
+  id: string;
+  /** Plain text. */
+  label: string;
+  /** One line under the label; accepts inline markup (`code`, **bold**). */
+  detail?: string;
+  /** Id of the lane the node sits in; nodes without one are drawn outside any lane. */
+  group?: string;
+}
+
+/**
+ * Labels the connector between two consecutive nodes. Every connector between
+ * consecutive nodes is drawn whether or not it has an edge; an edge only names
+ * it. The flow is linear: an edge must join a node to the one that follows it.
+ */
+export interface DiagramEdge {
+  from: string;
+  to: string;
+  label?: string;
+}
+
+/**
+ * A flow diagram drawn from data, so every diagram shares the palette of the
+ * page and is translated like any other text. The drawing is decorative for
+ * assistive technology: `title` and `description` plus the ordered nodes are its
+ * text alternative. Nodes are listed in flow order (see lib/diagram.ts).
+ */
+export interface DiagramBlock {
+  type: 'diagram';
+  /** Plain text: names the diagram in its visible caption. */
+  title: string;
+  /** Plain text: what the diagram shows, read in place of the drawing. */
+  description: string;
+  /** Visible text under the title; accepts inline markup. */
+  caption?: string;
+  groups?: DiagramGroup[];
+  nodes: DiagramNode[];
+  edges?: DiagramEdge[];
+}
+
 export type FaqAnswerBlock = ParagraphBlock | ListBlock | CodeBlock;
 
 export interface FaqBlock {
@@ -77,6 +128,7 @@ export type DocBlock =
   | TableBlock
   | CalloutBlock
   | LogoRowBlock
+  | DiagramBlock
   | FaqBlock;
 
 export const API_BASE_URL_TOKEN = '{{API_BASE_URL}}';
@@ -123,6 +175,10 @@ export interface DocLabels {
   calloutInfo: string;
   /** Bold lead-in of a warning callout ("Important"). */
   calloutWarning: string;
+  /** Bold prefix of a diagram's visible caption ("Diagram"). */
+  diagramLabel: string;
+  /** Introduces the connector that leaves a step in a diagram's text alternative ("Then"). */
+  diagramNextLabel: string;
 }
 
 export interface DocContent {

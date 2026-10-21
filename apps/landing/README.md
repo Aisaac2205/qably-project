@@ -38,6 +38,39 @@ Paragraphs, list items, table cells, callouts, FAQ questions and answers and sub
 
 A marker with no partner stays literal, a link with an empty label stays literal, and a target outside the two forms above (`javascript:`, `data:`, `http:`, a relative path, a URL with credentials) is rejected: only its label is shown. `lib/docs-links.test.ts` fails when a link written in markup points to a page or an anchor that does not exist, or has a rejected target. Code blocks, code-group labels, page titles and descriptions are plain text and never parsed. Subheading anchors and table-of-contents labels come from the words, so adding markup to a heading never moves its anchor.
 
+### Docs UI language
+
+The reader is dark, monochrome and quiet: Geist, tokens from `src/styles/global.css` only, no hue anywhere in `components/` (`components/docs-components.test.ts` fails on a status or palette colour, a colour literal, an arbitrary Tailwind value, a string injected as HTML or a random id).
+
+- **Hierarchy:** the lead paragraph is larger and muted, `h2` has 3rem above and 1rem below, body text is 1rem with 1.75 leading in `fg-muted`, and headings and `**bold**` words use `fg`.
+- **Callouts** (`components/Callout.astro`): a bordered surface with a Phosphor icon and a bold lead-in label from `content.labels` (`calloutInfo`, `calloutWarning`: "Note", "Important"). Tone is carried by icon, label and a stronger hairline for a warning, never by colour.
+- **Tabs** (`components/CodeGroup.astro`): an underlined strip that scrolls inside itself; ids come from the section id and the block position, so two builds emit the same HTML.
+- **Rails:** the sizes and offsets are tokens added under `:root` and `@theme inline` in `global.css`: `--docs-sidebar-width`, `--docs-toc-width`, `--docs-article-width` (classes `w-docs-sidebar`, `w-docs-toc`, `max-w-docs-article`), `--docs-scroll-offset` (`top-docs-offset`, `scroll-mt-docs-offset`, also the offset the scroll spy reads) and `max-h-docs-rail`.
+- **Diagrams** (`components/Diagram.astro`, `lib/diagram.ts`): a `diagram` block draws a linear flow from data, in the palette of the page, with an ordered text alternative.
+
+```ts
+{
+  type: 'diagram',
+  title: 'From CI to Qably',            // plain text, names the figure
+  description: 'The test report ...',   // plain text, read in place of the drawing
+  caption: 'Qably never runs ...',      // optional, inline markup allowed
+  groups: [                             // optional lanes, in flow order
+    { id: 'ci', label: 'Your CI', tone: 'external' },
+    { id: 'qably', label: 'Qably', tone: 'qably' },
+  ],
+  nodes: [                              // in flow order; a lane's nodes must be consecutive
+    { id: 'runner', label: 'Test runner', group: 'ci' },
+    { id: 'report', label: 'Report', detail: 'A `junit.xml` file', group: 'ci' },
+    { id: 'ingest', label: 'Ingest API', group: 'qably' },
+  ],
+  edges: [                              // optional: only names the connector between consecutive nodes
+    { from: 'report', to: 'ingest', label: 'uploads' },
+  ],
+}
+```
+
+The flow is linear: an edge must join a node to the one that follows it (a back edge, a skipped step, an unknown id or a split lane is rejected by `validateDiagram`, and `content.test.ts` runs it on every diagram). Two parallel pipelines are two diagrams. Nodes run in a row from `md` and in a column on phones; lanes stack.
+
 ## Project Structure
 
 ```text

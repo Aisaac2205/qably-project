@@ -53,6 +53,12 @@ function visitBlockProse(block: DocBlock, where: string, visit: (text: string, w
     case 'faq':
       for (const item of block.items) visit(item.question, where);
       break;
+    case 'diagram':
+      if (block.caption !== undefined) visit(block.caption, where);
+      for (const node of block.nodes) {
+        if (node.detail !== undefined) visit(node.detail, where);
+      }
+      break;
     default:
       break;
   }

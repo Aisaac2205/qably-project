@@ -14,6 +14,8 @@ export const es: DocContent = {
   labels: {
     calloutInfo: 'Nota',
     calloutWarning: 'Importante',
+    diagramLabel: 'Diagrama',
+    diagramNextLabel: 'Luego',
   },
   navGroups: [
     { label: 'Primeros pasos', pageSlugs: ['overview', 'quickstart', 'other-runners'] },

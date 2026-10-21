@@ -1,4 +1,5 @@
 ---
+import { List } from '@phosphor-icons/react';
 import type { DocContent } from '../content/types';
 import type { TocEntry } from '../lib/toc';
 import DocsTocList from './DocsTocList.astro';
@@ -13,17 +14,25 @@ interface Props {
 const { content, entries, show } = Astro.props;
 ---
 
-{/*
-  Right rail: xl and up. The column is reserved even when the page has no
-  contents list, so the article keeps the same width from page to page.
-  Below xl the same entries live in DocsMobileNav.
-*/}
-<div class="hidden w-56 shrink-0 xl:block">
+{
+  /*
+    Right rail: xl and up. The column is reserved even when the page has no
+    contents list, so the article keeps the same width from page to page.
+    It stretches to the height of the article (self-stretch) because a pinned
+    child can only travel inside its parent: in a column as short as the list
+    the list would scroll away with the page. Below xl the same entries live in
+    DocsMobileNav.
+  */
+}
+<div class="hidden w-docs-toc shrink-0 self-stretch xl:block">
   {
     show && (
-      <div class="docs-rail p-1">
+      <div class="sticky top-docs-offset max-h-docs-rail overflow-y-auto overscroll-contain p-1">
         <nav aria-labelledby="docs-toc-title" data-docs-toc>
-          <p id="docs-toc-title" class="px-2 pb-1.5 text-sm font-semibold text-fg">
+          <p id="docs-toc-title" class="mb-3 flex items-center gap-2 px-3 text-sm font-semibold text-fg">
+            <span aria-hidden="true" class="shrink-0 text-fg-muted">
+              <List size={16} />
+            </span>
             {content.tocLabel}
           </p>
           <DocsTocList entries={entries} />

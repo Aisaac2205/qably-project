@@ -12,8 +12,16 @@ interface Props {
 const { content, locale, currentSlug } = Astro.props;
 ---
 
-{/* Left rail: lg and up. Below lg the same list lives in DocsMobileNav. */}
-<div class="docs-rail hidden w-64 shrink-0 p-1 lg:block">
+{
+  /*
+    Left rail: lg and up. Below lg the same list lives in DocsMobileNav. Pinned
+    below the fixed header (top-docs-offset) and never taller than what is left
+    of the viewport (max-h-docs-rail): a longer list scrolls on its own.
+  */
+}
+<div
+  class="sticky top-docs-offset hidden max-h-docs-rail w-docs-sidebar shrink-0 overflow-y-auto overscroll-contain p-1 lg:block"
+>
   <nav aria-label={content.navAriaLabel} data-docs-sidebar>
     <DocsNavList content={content} locale={locale} currentSlug={currentSlug} idPrefix="sidebar" />
   </nav>
