@@ -72,7 +72,7 @@ const threadDetailAfterReply: ChatThreadDetailRecord = {
 const listThreads = vi.fn()
 const createThread = vi.fn()
 const getThread = vi.fn()
-const sendMessage = vi.fn()
+const streamMessage = vi.fn()
 const sendToReview = vi.fn()
 const deleteThread = vi.fn()
 
@@ -80,7 +80,7 @@ vi.mock('@/features/ai-review/api/chat.api', () => ({
   listThreads: (...args: unknown[]) => listThreads(...args),
   createThread: (...args: unknown[]) => createThread(...args),
   getThread: (...args: unknown[]) => getThread(...args),
-  sendMessage: (...args: unknown[]) => sendMessage(...args),
+  streamMessage: (...args: unknown[]) => streamMessage(...args),
   sendToReview: (...args: unknown[]) => sendToReview(...args),
   deleteThread: (...args: unknown[]) => deleteThread(...args),
 }))
@@ -123,7 +123,10 @@ describe('ProjectChatPanel', () => {
   it('starts a new thread and shows the assistant reply after sending a message', async () => {
     listThreads.mockResolvedValue([])
     createThread.mockResolvedValue(thread)
-    sendMessage.mockResolvedValue(assistantReply)
+    streamMessage.mockResolvedValue({
+      userMessage: threadDetailAfterReply.messages[0],
+      assistantMessage: assistantReply,
+    })
     getThread.mockResolvedValue(threadDetailAfterReply)
     const user = userEvent.setup()
 
@@ -141,7 +144,7 @@ describe('ProjectChatPanel', () => {
   it('keeps the user message visible and shows the assistant as unavailable', async () => {
     listThreads.mockResolvedValue([])
     createThread.mockResolvedValue(thread)
-    sendMessage.mockRejectedValue(new ApiError(503, 'unavailable', 'provider-unavailable'))
+    streamMessage.mockRejectedValue(new ApiError(503, 'unavailable', 'provider-unavailable'))
     getThread.mockResolvedValue({
       ...thread,
       messages: [

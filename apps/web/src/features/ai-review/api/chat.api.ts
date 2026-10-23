@@ -1,10 +1,14 @@
 import type {
-  ChatMessageRecord,
   ChatSendToReviewRecord,
   ChatThreadDetailRecord,
   ChatThreadRecord,
 } from '@qably/types'
-import { apiRequest } from '@/lib/api-client'
+import { apiRequest, apiStream } from '@/lib/api-client'
+import {
+  readChatStream,
+  type ChatStreamDone,
+  type ChatStreamOptions,
+} from '../lib/chat-stream'
 
 export function listThreads(
   projectId: string,
@@ -46,21 +50,32 @@ export function getThread(
   )
 }
 
-export function sendMessage(
+export interface ChatMessageInput {
+  content: string
+  caseIds?: string[]
+  filePath?: string
+}
+
+/**
+ * Sends a message and streams the assistant reply. Resolves with the canonical
+ * user and assistant rows once the server reports the reply as done.
+ */
+export async function streamMessage(
   projectId: string,
   threadId: string,
-  content: string,
-  caseIds: string[] = [],
-  filePath?: string,
-): Promise<ChatMessageRecord> {
-  const body: { content: string; caseIds?: string[]; filePath?: string } = { content }
+  { content, caseIds = [], filePath }: ChatMessageInput,
+  options: ChatStreamOptions = {},
+): Promise<ChatStreamDone> {
+  const body: ChatMessageInput = { content }
   if (caseIds.length > 0) body.caseIds = caseIds
   if (filePath !== undefined) body.filePath = filePath
 
-  return apiRequest<ChatMessageRecord>(
-    `/projects/${projectId}/chat/threads/${threadId}/messages`,
-    { method: 'POST', body },
+  const stream = await apiStream(
+    `/projects/${projectId}/chat/threads/${threadId}/messages/stream`,
+    { method: 'POST', body, signal: options.signal },
   )
+
+  return readChatStream(stream, options)
 }
 
 export function sendToReview(
