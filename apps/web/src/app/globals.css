@@ -69,6 +69,21 @@
   --heatmap-l3:        oklch(0.560 0.180 145);
   --heatmap-l4:        oklch(0.440 0.200 145);
 
+  /* Syntax highlighting — read by sugar-high as color: var(--sh-<token>) in
+     CodeSnippet. Code only, never UI or status. Every step is at least 4.5:1
+     on --bg (the snippet's bg-canvas), WCAG 2 luminance from the OKLCH value:
+     keyword 6.09, string 5.67, class 5.56, property 5.79, entity 5.52,
+     sign 7.43, comment 5.05, identifier/jsxliterals (--fg) 17.09. */
+  --sh-identifier:     var(--fg);
+  --sh-keyword:        oklch(0.500 0.200 300);
+  --sh-string:         oklch(0.480 0.120 150);
+  --sh-class:          oklch(0.500 0.150 255);
+  --sh-property:       oklch(0.500 0.130 50);
+  --sh-entity:         oklch(0.490 0.080 195);
+  --sh-jsxliterals:    var(--fg);
+  --sh-sign:           oklch(0.430 0.006 85);
+  --sh-comment:        oklch(0.520 0.012 260);
+
   /* Auth mesh — decorative panel only, never for content or status.
      The shader's colour-dodge grain doubles each channel, so these stay
      dark enough that the doubled result never reaches white. */

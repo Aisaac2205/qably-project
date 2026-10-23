@@ -1,7 +1,17 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { CopySimple, Check } from '@phosphor-icons/react'
+import { parse, render } from 'sugar-high/core'
+import { tokenize as tokenizeTypeScript } from 'sugar-high/lang/typescript'
+
+// Evidence excerpts are TypeScript, so only the TypeScript lexer is bundled instead of
+// sugar-high's full language registry. render() HTML-escapes every token value and emits
+// fixed class/style attributes (color: var(--sh-<token>)), so the markup is safe to inject.
+// Lines are joined with '\n' between inline spans, so textContent equals the source.
+function highlightTypeScript(code: string): string {
+  return render(parse(code, { tokenize: tokenizeTypeScript }))
+}
 
 export function CodeSnippet({
   code,
@@ -11,6 +21,7 @@ export function CodeSnippet({
   language?: string
 }) {
   const [copied, setCopied] = useState(false)
+  const highlighted = useMemo(() => highlightTypeScript(code), [code])
 
   const handleCopy = useCallback(async () => {
     try {
@@ -46,7 +57,7 @@ export function CodeSnippet({
         </button>
       </div>
       <pre className="p-4 overflow-x-auto text-xs sm:text-sm font-mono text-default leading-relaxed whitespace-pre">
-        <code>{code}</code>
+        <code dangerouslySetInnerHTML={{ __html: highlighted }} />
       </pre>
     </div>
   )

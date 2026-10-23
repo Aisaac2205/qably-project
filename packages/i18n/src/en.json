@@ -1421,7 +1421,12 @@
       "testError": "Test message failed",
       "toggleAria": "Enable {{name}}",
       "deleteTitle": "Remove “{{name}}”?",
-      "deleteDescription": "Qably stops sending alerts to this channel immediately. This cannot be undone."
+      "deleteDescription": "Qably stops sending alerts to this channel immediately. This cannot be undone.",
+      "editAction": "Edit {{name}}",
+      "editTitle": "Edit notification channel",
+      "editDescription": "Change the name and the events this channel alerts on. To use a different webhook URL, add a new channel.",
+      "saving": "Saving…",
+      "updateError": "Couldn't save the changes. Try again."
     },
     "members": {
       "email": "Email",

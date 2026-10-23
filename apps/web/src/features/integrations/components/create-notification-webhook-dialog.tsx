@@ -3,7 +3,6 @@
 import { useState, type FormEvent } from 'react'
 import Image from 'next/image'
 import type { NotificationEventType, NotificationWebhookType } from '@qably/types'
-import { DEFAULT_NOTIFICATION_PREFERENCES } from '@qably/types'
 import {
   Dialog,
   DialogContent,
@@ -12,22 +11,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTranslation } from '@/lib/i18n'
-
-const MAX_NAME_LENGTH = 80
-
-const WEBHOOK_TYPE_LOGO: Record<NotificationWebhookType, string> = {
-  slack: '/logos/slack.svg',
-  discord: '/logos/discord.svg',
-}
-
-const EVENT_TYPES = Object.keys(
-  DEFAULT_NOTIFICATION_PREFERENCES,
-) as NotificationEventType[]
+import {
+  NOTIFICATION_WEBHOOK_LOGO,
+  WebhookEventTypesFieldset,
+  WebhookNameField,
+  toggleWebhookEventType,
+  webhookEventTypesErrorKey,
+  webhookNameErrorKey,
+} from './notification-webhook-fields'
 
 interface CreateNotificationWebhookDialogProps {
   open: boolean
@@ -77,11 +72,7 @@ function CreateNotificationWebhookDialogContent({
   const [validationError, setValidationError] = useState('')
 
   function toggleEventType(eventType: NotificationEventType, checked: boolean) {
-    setEventTypes((current) =>
-      checked
-        ? [...current, eventType]
-        : current.filter((value) => value !== eventType),
-    )
+    setEventTypes((current) => toggleWebhookEventType(current, eventType, checked))
   }
 
   function handleSubmit(event: FormEvent) {
@@ -89,20 +80,18 @@ function CreateNotificationWebhookDialogContent({
     const trimmedName = name.trim()
     const trimmedUrl = url.trim()
 
-    if (!trimmedName) {
-      setValidationError(t('settings.webhooks.nameRequired'))
-      return
-    }
-    if (trimmedName.length > MAX_NAME_LENGTH) {
-      setValidationError(t('settings.webhooks.nameTooLong'))
+    const nameErrorKey = webhookNameErrorKey(trimmedName)
+    if (nameErrorKey) {
+      setValidationError(t(nameErrorKey))
       return
     }
     if (!trimmedUrl) {
       setValidationError(t('settings.webhooks.urlRequired'))
       return
     }
-    if (eventTypes.length === 0) {
-      setValidationError(t('settings.webhooks.eventTypesRequired'))
+    const eventTypesErrorKey = webhookEventTypesErrorKey(eventTypes)
+    if (eventTypesErrorKey) {
+      setValidationError(t(eventTypesErrorKey))
       return
     }
 
@@ -133,7 +122,7 @@ function CreateNotificationWebhookDialogContent({
               <SelectValue>
                 <span className="flex items-center gap-1.5">
                   <Image
-                    src={WEBHOOK_TYPE_LOGO[type]}
+                    src={NOTIFICATION_WEBHOOK_LOGO[type]}
                     alt=""
                     width={16}
                     height={16}
@@ -145,32 +134,27 @@ function CreateNotificationWebhookDialogContent({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="slack">
-                <Image src={WEBHOOK_TYPE_LOGO.slack} alt="" width={16} height={16} className="size-4 shrink-0" />
+                <Image src={NOTIFICATION_WEBHOOK_LOGO.slack} alt="" width={16} height={16} className="size-4 shrink-0" />
                 <span>{t('settings.webhooks.typeSlack')}</span>
               </SelectItem>
               <SelectItem value="discord">
-                <Image src={WEBHOOK_TYPE_LOGO.discord} alt="" width={16} height={16} className="size-4 shrink-0" />
+                <Image src={NOTIFICATION_WEBHOOK_LOGO.discord} alt="" width={16} height={16} className="size-4 shrink-0" />
                 <span>{t('settings.webhooks.typeDiscord')}</span>
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="webhook-name">{t('settings.webhooks.nameLabel')}</Label>
-          <Input
-            id="webhook-name"
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value)
-              if (validationError) setValidationError('')
-            }}
-            placeholder={t('settings.webhooks.namePlaceholder')}
-            aria-invalid={Boolean(displayedError)}
-            autoFocus
-            disabled={isSubmitting}
-          />
-        </div>
+        <WebhookNameField
+          id="webhook-name"
+          value={name}
+          onChange={(value) => {
+            setName(value)
+            if (validationError) setValidationError('')
+          }}
+          invalid={Boolean(displayedError)}
+          disabled={isSubmitting}
+        />
 
         <div className="grid gap-2">
           <Label htmlFor="webhook-url">{t('settings.webhooks.urlLabel')}</Label>
@@ -192,30 +176,12 @@ function CreateNotificationWebhookDialogContent({
           <p className="text-xs text-muted">{t('settings.webhooks.urlHint')}</p>
         </div>
 
-        <fieldset className="grid gap-2">
-          <legend className="text-sm font-medium text-foreground">
-            {t('settings.webhooks.eventTypesLabel')}
-          </legend>
-          <div className="grid gap-2">
-            {EVENT_TYPES.map((eventType) => {
-              const checked = eventTypes.includes(eventType)
-              const label = t(`settings.notifications.events.${eventType}`)
-              return (
-                <div key={eventType} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`webhook-event-${eventType}`}
-                    checked={checked}
-                    disabled={isSubmitting}
-                    onCheckedChange={(next) => toggleEventType(eventType, next === true)}
-                  />
-                  <Label htmlFor={`webhook-event-${eventType}`} className="font-normal">
-                    {label}
-                  </Label>
-                </div>
-              )
-            })}
-          </div>
-        </fieldset>
+        <WebhookEventTypesFieldset
+          idPrefix="webhook-event"
+          value={eventTypes}
+          onToggle={toggleEventType}
+          disabled={isSubmitting}
+        />
 
         {displayedError && (
           <p role="alert" className="text-xs text-fail">

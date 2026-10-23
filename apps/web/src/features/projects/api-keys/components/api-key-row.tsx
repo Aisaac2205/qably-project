@@ -26,7 +26,7 @@ export function ApiKeyRow({ apiKey, onRevoke }: ApiKeyRowProps) {
     <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-5 sm:py-3.5">
       <Key size={28} className="shrink-0 text-accent-icon" aria-hidden="true" />
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-h-6 flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-default truncate">{apiKey.name}</span>
           <span className="rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted">
             {apiKey.prefix}…{apiKey.lastFour}

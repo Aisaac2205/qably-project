@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { useState } from 'react'
-import { CheckCircle, PaperPlaneTilt, WarningCircle } from '@phosphor-icons/react'
+import { CheckCircle, PaperPlaneTilt, PencilSimple, WarningCircle } from '@phosphor-icons/react'
 import type { NotificationWebhook } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ interface NotificationWebhookRowProps {
   webhook: NotificationWebhook
   canWrite: boolean
   onToggleEnabled: (webhook: NotificationWebhook, enabled: boolean) => void
+  onEdit: (webhook: NotificationWebhook) => void
   onDelete: (webhook: NotificationWebhook) => void
   onTest: (webhook: NotificationWebhook) => Promise<void>
 }
@@ -28,6 +29,7 @@ export function NotificationWebhookRow({
   webhook,
   canWrite,
   onToggleEnabled,
+  onEdit,
   onDelete,
   onTest,
 }: NotificationWebhookRowProps) {
@@ -95,6 +97,16 @@ export function NotificationWebhookRow({
 
         {canWrite && (
           <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onEdit(webhook)}
+              aria-label={t('settings.webhooks.editAction', { name: webhook.name })}
+            >
+              <PencilSimple size={14} aria-hidden="true" />
+            </Button>
+
             <Button
               type="button"
               variant="ghost"

@@ -367,6 +367,9 @@ importers:
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      sugar-high:
+        specifier: 2.5.2
+        version: 2.5.2
       tailwind-merge:
         specifier: ^2.6.1
         version: 2.6.1
@@ -7266,6 +7269,14 @@ packages:
       '@babel/core':
         optional: true
       babel-plugin-macros:
+        optional: true
+
+  sugar-high@2.5.2:
+    resolution: {integrity: sha512-6bWenmZIfwfSaTWr4NYOdlJvJ92zVMLY6duRY8zxdoDbJ9++Y4rkZq1PvzwVmuSx4gBHj2ne9wFA6T09watbkg==}
+    peerDependencies:
+      gpu-lexer: '>=0.0.2'
+    peerDependenciesMeta:
+      gpu-lexer:
         optional: true
 
   superagent@10.3.0:
@@ -15498,6 +15509,8 @@ snapshots:
       react: 19.2.4
     optionalDependencies:
       '@babel/core': 7.29.7
+
+  sugar-high@2.5.2: {}
 
   superagent@10.3.0:
     dependencies:
