@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CaretLeft, ChatsCircle, NotePencil } from '@phosphor-icons/react'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
@@ -8,8 +8,7 @@ import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { flattenAttachableCases } from '@/features/ai-review/lib/attachable-cases'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useTranslation } from '@/lib/i18n'
-import { ChatMessageList } from './chat-message-list'
-import { ChatComposer } from './chat-composer'
+import { AerisChat } from './aeris-chat'
 import { ChatThreadSidebar } from './chat-thread-sidebar'
 
 const CHAT_SIDEBAR_STORAGE_KEY = 'qably:project-chat-sidebar-collapsed'
@@ -30,22 +29,19 @@ export function ProjectChatPanel({
   projectId: string
   onExit?: () => void
 }) {
+  const chat = useProjectChat(projectId)
   const {
     threads,
     activeThreadId,
-    messages,
     isLoadingThread,
-    pendingMessage,
     deleteError,
     startNewChat,
     selectThread,
     removeThread,
-    send,
-  } = useProjectChat(projectId)
+  } = chat
   const { t } = useTranslation()
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialSidebarCollapsed)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
   const searchParams = useSearchParams()
   const [initialCaseId] = useState(() => searchParams.get('case'))
   const { suites, isLoading: isSuitesLoading } = useSuites(projectId)
@@ -69,14 +65,6 @@ export function ProjectChatPanel({
       return next
     })
   }
-
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    el.scrollTop = el.scrollHeight
-  }, [messages, pendingMessage])
-
-  const isSending = pendingMessage?.status === 'sending'
 
   const activeTitle = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId)?.title ?? null,
@@ -168,29 +156,12 @@ export function ProjectChatPanel({
           </button>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-          <ChatMessageList
-            projectId={projectId}
-            messages={messages}
-            pendingMessage={pendingMessage}
-            isLoadingThread={isLoadingThread}
-          />
-        </div>
-
-        {deleteError && (
-          <p
-            role="alert"
-            className="mx-3 mb-2 rounded-lg border border-fail/30 bg-fail-bg px-3 py-2 text-xs text-fail sm:mx-4"
-          >
-            {t('aiReview.deleteChatError')}
-          </p>
-        )}
-
-        <ChatComposer
+        <AerisChat
           key={isResolvingInitialCase ? 'resolving-initial-case' : 'ready'}
           projectId={projectId}
-          onSend={send}
-          disabled={isSending}
+          chat={chat}
+          isLoadingThread={isLoadingThread}
+          deleteError={deleteError}
           initialAttachedCase={activeThreadId === null ? initialAttachedCase : undefined}
         />
       </div>
