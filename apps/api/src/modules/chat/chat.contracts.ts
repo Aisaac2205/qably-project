@@ -76,4 +76,18 @@ export type ChatError =
   | 'no-code-evidence'
   | 'file-unreadable';
 
+/**
+ * What a streamed send produces, in order: reply text deltas, then either the
+ * stored messages or the failure. A `failed` with no delta before it happened
+ * before any reply text existed.
+ */
+export type ChatStreamEvent =
+  | { type: 'delta'; text: string }
+  | {
+      type: 'done';
+      userMessage: ChatMessageView;
+      assistantMessage: ChatMessageView;
+    }
+  | { type: 'failed'; error: ChatError };
+
 export const CHAT_ASSISTANT = Symbol('CHAT_ASSISTANT');

@@ -1,6 +1,16 @@
+import { Logger } from '@nestjs/common';
+import { ApiError } from '@google/genai';
 import type { Env } from '../../config/env';
-import type { GeminiClient } from '../ai/gemini.extractor';
-import { GeminiChatAssistant, type ChatReplyInput } from './chat.assistant';
+import type {
+  GeminiGenerateContentResponse,
+  GeminiStreamingClient,
+} from '../ai/gemini.extractor';
+import {
+  DisabledChatAssistant,
+  GeminiChatAssistant,
+  type ChatReplyInput,
+  type ChatReplyStreamEvent,
+} from './chat.assistant';
 import {
   PROJECT_DATA_CLOSE,
   PROJECT_DATA_OPEN,
@@ -32,10 +42,17 @@ function input(overrides: Partial<ChatReplyInput> = {}): ChatReplyInput {
   };
 }
 
+function unusedStream(): Promise<
+  AsyncGenerator<GeminiGenerateContentResponse>
+> {
+  return Promise.reject(new Error('generateContentStream was not expected'));
+}
+
 function capture() {
   const received: { params: Record<string, unknown> } = { params: {} };
-  const client: GeminiClient = {
+  const client: GeminiStreamingClient = {
     models: {
+      generateContentStream: unusedStream,
       generateContent: (params) => {
         received.params = params;
         return Promise.resolve({
@@ -161,8 +178,9 @@ describe('GeminiChatAssistant', () => {
   });
 
   it('forwards the parsed grounding declaration on a successful reply', async () => {
-    const client: GeminiClient = {
+    const client: GeminiStreamingClient = {
       models: {
+        generateContentStream: unusedStream,
         generateContent: () =>
           Promise.resolve({
             text: JSON.stringify({
@@ -192,8 +210,9 @@ describe('GeminiChatAssistant', () => {
   });
 
   it('treats a response missing the grounding declaration as a schema violation', async () => {
-    const client: GeminiClient = {
+    const client: GeminiStreamingClient = {
       models: {
+        generateContentStream: unusedStream,
         generateContent: () =>
           Promise.resolve({
             text: JSON.stringify({ reply: 'ok', cases: [] }),
@@ -214,8 +233,9 @@ describe('GeminiChatAssistant', () => {
       kind: 'source-excerpt' as const,
       id: `case-${index}`,
     }));
-    const client: GeminiClient = {
+    const client: GeminiStreamingClient = {
       models: {
+        generateContentStream: unusedStream,
         generateContent: () =>
           Promise.resolve({
             text: JSON.stringify({
@@ -233,5 +253,227 @@ describe('GeminiChatAssistant', () => {
       kind: 'provider-unavailable',
       reason: 'schema-violation',
     });
+  });
+});
+
+async function* chunks(
+  ...responses: GeminiGenerateContentResponse[]
+): AsyncGenerator<GeminiGenerateContentResponse> {
+  for (const response of responses) {
+    await Promise.resolve();
+    yield response;
+  }
+}
+
+function streamingClient(
+  generateContentStream: GeminiStreamingClient['models']['generateContentStream'],
+): GeminiStreamingClient {
+  return {
+    models: {
+      generateContent: () =>
+        Promise.reject(new Error('generateContent was not expected')),
+      generateContentStream,
+    },
+  };
+}
+
+async function collect(
+  stream: AsyncGenerator<ChatReplyStreamEvent>,
+): Promise<ChatReplyStreamEvent[]> {
+  const events: ChatReplyStreamEvent[] = [];
+  for await (const event of stream) events.push(event);
+  return events;
+}
+
+describe('GeminiChatAssistant.replyStream', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('streams the reply text as deltas and ends with the parsed outcome and the usage of the last chunk', async () => {
+    const client = streamingClient(() =>
+      Promise.resolve(
+        chunks(
+          { text: '{"reply":"Hel' },
+          { text: 'lo","cases":[],"grounding":{"status":"insufficient"}}' },
+          {
+            usageMetadata: {
+              promptTokenCount: 10,
+              candidatesTokenCount: 5,
+              totalTokenCount: 15,
+            },
+          },
+        ),
+      ),
+    );
+
+    const events = await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), {
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Hel' },
+      { type: 'delta', text: 'lo' },
+      {
+        type: 'outcome',
+        outcome: {
+          kind: 'replied',
+          reply: 'Hello',
+          cases: [],
+          grounding: { status: 'insufficient' },
+          usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        },
+      },
+    ]);
+  });
+
+  it('sends the same request as a plain reply, plus the abort signal', async () => {
+    const plain = capture();
+    await new GeminiChatAssistant(plain.client, env()).reply(input());
+    let streamed: Record<string, unknown> = {};
+    const client = streamingClient((params) => {
+      streamed = params;
+      return Promise.resolve(
+        chunks({
+          text: '{"reply":"ok","cases":[],"grounding":{"status":"insufficient"}}',
+        }),
+      );
+    });
+    const signal = new AbortController().signal;
+
+    await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), { signal }),
+    );
+
+    expect(streamed.contents).toEqual(plain.received.params.contents);
+    expect(streamed.config).toEqual({
+      ...(plain.received.params.config as Record<string, unknown>),
+      abortSignal: signal,
+    });
+  });
+
+  it('reports a credentials rejection as provider-unavailable, like a plain reply', async () => {
+    const client = streamingClient(() =>
+      Promise.reject(new ApiError({ message: 'invalid key', status: 401 })),
+    );
+
+    const events = await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), {
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect(events).toEqual([
+      {
+        type: 'outcome',
+        outcome: {
+          kind: 'provider-unavailable',
+          reason: 'invalid-credentials',
+        },
+      },
+    ]);
+  });
+
+  it('reports a failure in the middle of the stream as provider-unavailable after the deltas already sent', async () => {
+    async function* broken(): AsyncGenerator<GeminiGenerateContentResponse> {
+      await Promise.resolve();
+      yield { text: '{"reply":"Hel' };
+      throw new Error('socket hang up');
+    }
+    const client = streamingClient(() => Promise.resolve(broken()));
+
+    const events = await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), {
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Hel' },
+      {
+        type: 'outcome',
+        outcome: { kind: 'provider-unavailable', reason: 'socket hang up' },
+      },
+    ]);
+  });
+
+  it('validates the complete envelope at the end of the stream, like a plain reply', async () => {
+    const client = streamingClient(() =>
+      Promise.resolve(
+        chunks({ text: '{"reply":"ok",' }, { text: '"cases":[]}' }),
+      ),
+    );
+
+    const events = await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), {
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'outcome',
+      outcome: { kind: 'provider-unavailable', reason: 'schema-violation' },
+    });
+  });
+
+  it('reports a stream without any text as an empty response', async () => {
+    const client = streamingClient(() => Promise.resolve(chunks()));
+
+    const events = await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), {
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect(events).toEqual([
+      {
+        type: 'outcome',
+        outcome: { kind: 'provider-unavailable', reason: 'empty-response' },
+      },
+    ]);
+  });
+
+  it('reports a request aborted by the caller without logging it as a provider failure', async () => {
+    const errorLog = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const controller = new AbortController();
+    async function* interrupted(): AsyncGenerator<GeminiGenerateContentResponse> {
+      await Promise.resolve();
+      yield { text: '{"reply":"Hel' };
+      controller.abort();
+      throw new DOMException('This operation was aborted', 'AbortError');
+    }
+    const client = streamingClient(() => Promise.resolve(interrupted()));
+
+    const events = await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), {
+        signal: controller.signal,
+      }),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'outcome',
+      outcome: { kind: 'provider-unavailable', reason: 'aborted' },
+    });
+    expect(errorLog).not.toHaveBeenCalled();
+  });
+});
+
+describe('DisabledChatAssistant.replyStream', () => {
+  it('reports the provider as unavailable without streaming any text', async () => {
+    const events = await collect(new DisabledChatAssistant().replyStream());
+
+    expect(events).toEqual([
+      {
+        type: 'outcome',
+        outcome: {
+          kind: 'provider-unavailable',
+          reason: 'GEMINI_API_KEY not configured',
+        },
+      },
+    ]);
   });
 });

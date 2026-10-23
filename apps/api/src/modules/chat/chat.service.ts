@@ -5,7 +5,7 @@ import {
   type GroundingView,
   type RepoConnectionProvider,
 } from '@qably/types';
-import { err, ok, type Result } from '../../common/result';
+import { err, isErr, ok, type Result } from '../../common/result';
 import type { Prisma } from '../../../generated/prisma/client';
 import { DOMAIN_EVENTS } from '../../common/events/domain-events';
 import { DomainEvents } from '../../common/events/domain-events.service';
@@ -34,7 +34,12 @@ import {
   buildGroundingDeclineReply,
   type ChatProjectContext,
 } from './chat-prompt';
-import type { ChatAssistant, ChatHistoryEntry } from './chat.assistant';
+import type {
+  ChatAssistant,
+  ChatHistoryEntry,
+  ChatReplyInput,
+  ChatReplyOutcome,
+} from './chat.assistant';
 import {
   CHAT_ASSISTANT,
   CHAT_PROMPT_VERSION,
@@ -45,6 +50,7 @@ import {
   type ChatError,
   type ChatMessageView,
   type ChatRole,
+  type ChatStreamEvent,
   type ChatThreadDetailView,
   type ChatThreadView,
   type SendToReviewView,
@@ -92,6 +98,21 @@ interface MessageRow {
   attachedCaseIds?: string[];
   grounding?: unknown;
   createdAt: Date;
+}
+
+type RepliedOutcome = Extract<ChatReplyOutcome, { kind: 'replied' }>;
+
+/** A send that passed every check, with its user message already stored. */
+interface PreparedSend {
+  threadId: string;
+  content: string;
+  caseIds: string[];
+  hasAttachedFile: boolean;
+  threadNeedsTitle: boolean;
+  locale: 'es' | 'en';
+  userRow: MessageRow;
+  attachedCasesById: ReadonlyMap<string, AttachedCaseView>;
+  replyInput: ChatReplyInput;
 }
 
 function readGrounding(value: unknown): GroundingView | null {
@@ -388,6 +409,110 @@ export class ChatService {
     threadId: string,
     input: SendMessageInput,
   ): Promise<Result<ChatMessageView, ChatError>> {
+    const prepared = await this.prepareSend(
+      org,
+      user,
+      projectId,
+      threadId,
+      input,
+    );
+    if (isErr(prepared)) return prepared;
+
+    const outcome = await this.assistant.reply(prepared.value.replyInput);
+    if (outcome.kind === 'provider-unavailable') {
+      return err('provider-unavailable');
+    }
+
+    const completed = await this.completeSend(org, prepared.value, outcome);
+    if (isErr(completed)) return completed;
+
+    return ok(toMessageView(completed.value));
+  }
+
+  /**
+   * The streamed variant of sendMessage: same checks, same stored rows, with
+   * the reply text yielded as it arrives. A failure is yielded as `failed`, so
+   * a caller that has shown nothing yet can still answer it as an HTTP error.
+   *
+   * When the signal aborts, the stream ends without completing the send: no
+   * credit is spent, no reply is stored and the title is left alone, while the
+   * user message stays stored, as it does when the daily budget is exhausted.
+   */
+  async *streamMessage(
+    org: OrgContext,
+    user: AuthenticatedUser,
+    projectId: string,
+    threadId: string,
+    input: SendMessageInput,
+    signal: AbortSignal,
+  ): AsyncGenerator<ChatStreamEvent> {
+    const prepared = await this.prepareSend(
+      org,
+      user,
+      projectId,
+      threadId,
+      input,
+    );
+    if (isErr(prepared)) {
+      yield { type: 'failed', error: prepared.error };
+      return;
+    }
+
+    let outcome: ChatReplyOutcome | undefined;
+    if (!signal.aborted) {
+      const events = this.assistant.replyStream(prepared.value.replyInput, {
+        signal,
+      });
+      for await (const event of events) {
+        if (event.type === 'delta') {
+          yield { type: 'delta', text: event.text };
+        } else {
+          outcome = event.outcome;
+        }
+      }
+    }
+
+    if (signal.aborted) {
+      logger.log(
+        `Chat stream on thread ${threadId} aborted by the client: no reply stored, no credit spent`,
+      );
+      return;
+    }
+
+    if (outcome === undefined || outcome.kind === 'provider-unavailable') {
+      yield { type: 'failed', error: 'provider-unavailable' };
+      return;
+    }
+
+    const completed = await this.completeSend(org, prepared.value, outcome);
+    if (isErr(completed)) {
+      yield { type: 'failed', error: completed.error };
+      return;
+    }
+
+    yield {
+      type: 'done',
+      userMessage: toMessageView(
+        prepared.value.userRow,
+        undefined,
+        prepared.value.attachedCasesById,
+      ),
+      assistantMessage: toMessageView(completed.value),
+    };
+  }
+
+  /**
+   * Everything a send does before asking the model: the checks, the stored
+   * user message, the daily budget and the prompt. Every failure here happens
+   * before any reply text exists.
+   */
+  private async prepareSend(
+    org: OrgContext,
+    user: AuthenticatedUser,
+    projectId: string,
+    threadId: string,
+    input: SendMessageInput,
+  ): Promise<Result<PreparedSend, ChatError>> {
     const thread = await this.findThread(org, user, projectId, threadId);
     if (thread === null) return err('thread-not-found');
 
@@ -425,7 +550,7 @@ export class ChatService {
       (message) => message.role === 'assistant',
     );
 
-    await this.prisma.chatMessage.create({
+    const userRow = await this.prisma.chatMessage.create({
       data: {
         threadId,
         role: 'user',
@@ -450,27 +575,50 @@ export class ChatService {
             attachedFile,
           )
         : undefined;
-    const outcome = await this.assistant.reply({
-      locale,
-      message: input.content,
-      history: history
-        .slice()
-        .reverse()
-        .map(
-          (row): ChatHistoryEntry => ({ role: row.role, content: row.content }),
-        ),
-      context,
-      caseContext,
-    });
 
-    if (outcome.kind === 'provider-unavailable') {
-      return err('provider-unavailable');
-    }
-
-    const manifest = buildGroundingManifest(
+    return ok({
+      threadId,
+      content: input.content,
       caseIds,
-      attachedFile !== undefined,
-    );
+      hasAttachedFile: attachedFile !== undefined,
+      threadNeedsTitle,
+      locale,
+      userRow,
+      attachedCasesById: new Map(
+        attachedRows.map((row) => [
+          row.id,
+          { id: row.id, name: row.name, suiteName: row.suite.name },
+        ]),
+      ),
+      replyInput: {
+        locale,
+        message: input.content,
+        history: history
+          .slice()
+          .reverse()
+          .map(
+            (row): ChatHistoryEntry => ({
+              role: row.role,
+              content: row.content,
+            }),
+          ),
+        context,
+        caseContext,
+      },
+    });
+  }
+
+  /**
+   * Grounds a finished reply, then spends the monthly credit and stores the
+   * reply in one transaction, so a failed write rolls the credit back too.
+   */
+  private async completeSend(
+    org: OrgContext,
+    prepared: PreparedSend,
+    outcome: RepliedOutcome,
+  ): Promise<Result<MessageRow, ChatError>> {
+    const { threadId, caseIds, locale, threadNeedsTitle } = prepared;
+    const manifest = buildGroundingManifest(caseIds, prepared.hasAttachedFile);
     const resolution = resolveGrounding(outcome.grounding, manifest);
 
     const attachedIdSet = new Set(caseIds);
@@ -507,7 +655,10 @@ export class ChatService {
         await tx.chatThread.update({
           where: { id: threadId },
           data: threadNeedsTitle
-            ? { title: threadTitleFrom(input.content), updatedAt: new Date() }
+            ? {
+                title: threadTitleFrom(prepared.content),
+                updatedAt: new Date(),
+              }
             : { updatedAt: new Date() },
         });
         return created;
@@ -516,7 +667,7 @@ export class ChatService {
 
     if (assistantRow === null) return err('ai-not-enabled');
 
-    return ok(toMessageView(assistantRow));
+    return ok(assistantRow);
   }
 
   async sendToReview(

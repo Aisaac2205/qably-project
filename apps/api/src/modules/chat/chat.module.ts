@@ -7,7 +7,7 @@ import type { Env } from '../../config/env';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AiModule } from '../ai/ai.module';
 import { GEMINI_CLIENT } from '../ai/ai.tokens';
-import type { GeminiClient } from '../ai/gemini.extractor';
+import type { GeminiStreamingClient } from '../ai/gemini.extractor';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { SourceReader } from '../repository/source-reader';
 import {
@@ -37,7 +37,7 @@ import { ChatService } from './chat.service';
     {
       provide: CHAT_ASSISTANT,
       inject: [ENV, GEMINI_CLIENT],
-      useFactory: (env: Env, client: GeminiClient | null) =>
+      useFactory: (env: Env, client: GeminiStreamingClient | null) =>
         env.GEMINI_API_KEY === undefined || client === null
           ? new DisabledChatAssistant()
           : new GeminiChatAssistant(client, env),

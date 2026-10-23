@@ -5,7 +5,11 @@ import { InjectEnv } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { GEMINI_CLIENT } from '../ai/ai.tokens';
 import type { TokenUsage } from '../ai/extraction.contracts';
-import type { GeminiClient } from '../ai/gemini.extractor';
+import type {
+  GeminiStreamingClient,
+  GeminiUsageMetadata,
+} from '../ai/gemini.extractor';
+import { createReplyDeltaExtractor } from './chat-reply-stream';
 import {
   buildCaseContextAcknowledgement,
   buildChatSystemInstruction,
@@ -48,8 +52,25 @@ export type ChatReplyOutcome =
     }
   | { kind: 'provider-unavailable'; reason: string };
 
+/**
+ * A streamed reply: zero or more deltas of reply text, then exactly one
+ * outcome. The outcome is authoritative; the deltas only preview it.
+ */
+export type ChatReplyStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'outcome'; outcome: ChatReplyOutcome };
+
+export interface ChatReplyStreamOptions {
+  /** Aborts the provider request when the caller goes away. */
+  signal: AbortSignal;
+}
+
 export interface ChatAssistant {
   reply(input: ChatReplyInput): Promise<ChatReplyOutcome>;
+  replyStream(
+    input: ChatReplyInput,
+    options: ChatReplyStreamOptions,
+  ): AsyncGenerator<ChatReplyStreamEvent>;
 }
 
 const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
@@ -164,7 +185,7 @@ export class GeminiChatAssistant implements ChatAssistant {
   private readonly model: string;
 
   constructor(
-    @Inject(GEMINI_CLIENT) private readonly client: GeminiClient,
+    @Inject(GEMINI_CLIENT) private readonly client: GeminiStreamingClient,
     @InjectEnv() env: Env,
   ) {
     this.model = env.GEMINI_MODEL;
@@ -172,51 +193,101 @@ export class GeminiChatAssistant implements ChatAssistant {
 
   async reply(input: ChatReplyInput): Promise<ChatReplyOutcome> {
     try {
-      const response = await this.client.models.generateContent({
-        model: this.model,
-        contents: toContents(input),
-        config: {
-          systemInstruction: buildChatSystemInstruction(input.locale),
-          responseMimeType: 'application/json',
-          responseJsonSchema: RESPONSE_JSON_SCHEMA,
-          temperature: TEMPERATURE,
-          maxOutputTokens: MAX_OUTPUT_TOKENS,
-          httpOptions: {
-            timeout: TIMEOUT_MS,
-            retryOptions: {
-              attempts: RETRY_ATTEMPTS,
-              httpStatusCodes: RETRYABLE_STATUS_CODES,
-            },
-          },
-        },
-      });
+      const response = await this.client.models.generateContent(
+        this.request(input),
+      );
 
       return this.toOutcome(response.text, response.usageMetadata);
     } catch (error) {
-      if (
-        error instanceof ApiError &&
-        (error.status === 401 || error.status === 403)
-      ) {
-        this.logger.warn(
-          'Gemini rejected the chat request: invalid credentials',
-        );
-        return { kind: 'provider-unavailable', reason: 'invalid-credentials' };
-      }
-      const reason = error instanceof Error ? error.message : 'unknown-error';
-      this.logger.error(`Gemini chat request failed: ${reason}`);
-      return { kind: 'provider-unavailable', reason };
+      return this.toFailure(error);
     }
+  }
+
+  /**
+   * Same request as reply, streamed. The text is accumulated and parsed as a
+   * whole at the end, exactly like reply; the deltas are only a preview.
+   */
+  async *replyStream(
+    input: ChatReplyInput,
+    options: ChatReplyStreamOptions,
+  ): AsyncGenerator<ChatReplyStreamEvent> {
+    const extractor = createReplyDeltaExtractor();
+    let text: string | undefined;
+    let usageMetadata: GeminiUsageMetadata | undefined;
+
+    try {
+      const stream = await this.client.models.generateContentStream(
+        this.request(input, options.signal),
+      );
+
+      for await (const chunk of stream) {
+        if (chunk.usageMetadata !== undefined) {
+          usageMetadata = chunk.usageMetadata;
+        }
+        const piece = chunk.text;
+        if (piece === undefined || piece === '') continue;
+
+        text = (text ?? '') + piece;
+        const delta = extractor.push(piece);
+        if (delta !== '') yield { type: 'delta', text: delta };
+      }
+    } catch (error) {
+      if (options.signal.aborted) {
+        this.logger.debug('Gemini chat stream aborted by the caller');
+        yield {
+          type: 'outcome',
+          outcome: { kind: 'provider-unavailable', reason: 'aborted' },
+        };
+        return;
+      }
+      yield { type: 'outcome', outcome: this.toFailure(error) };
+      return;
+    }
+
+    yield { type: 'outcome', outcome: this.toOutcome(text, usageMetadata) };
+  }
+
+  private request(
+    input: ChatReplyInput,
+    signal?: AbortSignal,
+  ): Record<string, unknown> {
+    return {
+      model: this.model,
+      contents: toContents(input),
+      config: {
+        systemInstruction: buildChatSystemInstruction(input.locale),
+        responseMimeType: 'application/json',
+        responseJsonSchema: RESPONSE_JSON_SCHEMA,
+        temperature: TEMPERATURE,
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        httpOptions: {
+          timeout: TIMEOUT_MS,
+          retryOptions: {
+            attempts: RETRY_ATTEMPTS,
+            httpStatusCodes: RETRYABLE_STATUS_CODES,
+          },
+        },
+        ...(signal === undefined ? {} : { abortSignal: signal }),
+      },
+    };
+  }
+
+  private toFailure(error: unknown): ChatReplyOutcome {
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      this.logger.warn('Gemini rejected the chat request: invalid credentials');
+      return { kind: 'provider-unavailable', reason: 'invalid-credentials' };
+    }
+    const reason = error instanceof Error ? error.message : 'unknown-error';
+    this.logger.error(`Gemini chat request failed: ${reason}`);
+    return { kind: 'provider-unavailable', reason };
   }
 
   private toOutcome(
     text: string | undefined,
-    usageMetadata:
-      | {
-          promptTokenCount?: number;
-          candidatesTokenCount?: number;
-          totalTokenCount?: number;
-        }
-      | undefined,
+    usageMetadata: GeminiUsageMetadata | undefined,
   ): ChatReplyOutcome {
     if (text === undefined) {
       return { kind: 'provider-unavailable', reason: 'empty-response' };
@@ -255,12 +326,18 @@ export class GeminiChatAssistant implements ChatAssistant {
   }
 }
 
+const NOT_CONFIGURED: ChatReplyOutcome = {
+  kind: 'provider-unavailable',
+  reason: 'GEMINI_API_KEY not configured',
+};
+
 @Injectable()
 export class DisabledChatAssistant implements ChatAssistant {
   reply(): Promise<ChatReplyOutcome> {
-    return Promise.resolve({
-      kind: 'provider-unavailable',
-      reason: 'GEMINI_API_KEY not configured',
-    });
+    return Promise.resolve(NOT_CONFIGURED);
+  }
+
+  async *replyStream(): AsyncGenerator<ChatReplyStreamEvent> {
+    yield { type: 'outcome', outcome: await this.reply() };
   }
 }

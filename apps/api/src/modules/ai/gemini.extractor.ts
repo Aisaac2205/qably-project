@@ -152,8 +152,20 @@ export interface GeminiClient {
   };
 }
 
-export function createGeminiClient(apiKey: string): GeminiClient {
-  return new GoogleGenAI({ apiKey }) as unknown as GeminiClient;
+/**
+ * A client that can also stream a response chunk by chunk. Kept apart from
+ * GeminiClient so the extractors, which never stream, need no streaming fake.
+ */
+export interface GeminiStreamingClient extends GeminiClient {
+  models: GeminiClient['models'] & {
+    generateContentStream(
+      params: Record<string, unknown>,
+    ): Promise<AsyncGenerator<GeminiGenerateContentResponse>>;
+  };
+}
+
+export function createGeminiClient(apiKey: string): GeminiStreamingClient {
+  return new GoogleGenAI({ apiKey }) as unknown as GeminiStreamingClient;
 }
 
 @Injectable()
