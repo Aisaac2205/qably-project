@@ -146,6 +146,17 @@ describe('buildChatSystemInstruction', () => {
     }
   });
 
+  it('tells the assistant never to report an empty suite as a coverage gap', () => {
+    expect(buildChatSystemInstruction('es')).toMatch(
+      /suite vacía[\s\S]*nunca la presentes como un hueco de cobertura/i,
+    );
+    expect(buildChatSystemInstruction('es')).toMatch(/archivar o limpiar/i);
+    expect(buildChatSystemInstruction('en')).toMatch(
+      /empty suite[\s\S]*never present it as a coverage gap/i,
+    );
+    expect(buildChatSystemInstruction('en')).toMatch(/archive or clean up/i);
+  });
+
   it('requires every suggested-case field to match the reply locale, not just the reply text (Unit 5 verification, no new behavior)', () => {
     expect(buildChatSystemInstruction('es')).toMatch(
       /cada campo de cada caso/i,
@@ -220,6 +231,22 @@ describe('buildProjectContextTurn', () => {
     );
 
     expect(turn.match(new RegExp(PROJECT_DATA_CLOSE, 'g'))).toHaveLength(1);
+  });
+
+  it('flags a suite with no active cases as empty and possibly retired', () => {
+    const turn = buildProjectContextTurn(
+      context({
+        suites: [
+          { name: 'Login', cases: 12 },
+          { name: 'Proposal review', cases: 0 },
+        ],
+      }),
+    );
+
+    expect(turn).toContain('- Login (12 cases)');
+    expect(turn).toContain(
+      '- Proposal review (0 active cases — empty, possibly retired)',
+    );
   });
 
   it('marks an empty section instead of leaving it blank', () => {

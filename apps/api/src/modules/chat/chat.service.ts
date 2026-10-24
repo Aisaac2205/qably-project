@@ -1154,9 +1154,12 @@ export class ChatService {
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });
+    // Only active cases count: a suite whose cases were all deprecated or whose
+    // spec was deleted must reach the prompt as empty, not as covered.
     const caseCounts = await readSuiteCaseCounts(
       this.prisma,
       suites.map((suite) => suite.id),
+      { activeOnly: true },
     );
 
     return suites.map((suite) => ({

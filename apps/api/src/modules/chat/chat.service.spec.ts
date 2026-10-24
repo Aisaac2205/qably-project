@@ -346,7 +346,7 @@ describe('ChatService', () => {
     );
   });
 
-  it('counts the cases of the project suites with one grouped query and reports empty suites as zero', async () => {
+  it('counts the active cases of the project suites with one grouped query and reports empty suites as zero', async () => {
     const prisma = createPrisma();
     prisma.suite.findMany.mockResolvedValue([
       { id: 'suite-1', name: 'Checkout' },
@@ -375,7 +375,7 @@ describe('ChatService', () => {
     });
     expect(prisma.testCase.groupBy).toHaveBeenCalledWith({
       by: ['suiteId'],
-      where: { suiteId: { in: ['suite-1', 'suite-2'] } },
+      where: { suiteId: { in: ['suite-1', 'suite-2'] }, state: 'active' },
       _count: { _all: true },
     });
     expect(assistant.reply).toHaveBeenCalledWith(

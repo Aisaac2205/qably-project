@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { GroundingView } from '@qably/types';
 import { extractedCaseObjectSchema } from '../ai/extraction.contracts';
 
-export const CHAT_PROMPT_VERSION = 'chat-v5';
+export const CHAT_PROMPT_VERSION = 'chat-v6';
 export const MAX_SUGGESTED_CASES = 5;
 export const MAX_HISTORY_MESSAGES = 20;
 export const MAX_REPLY_LENGTH = 4000;

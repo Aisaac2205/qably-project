@@ -75,6 +75,20 @@ describe('readSuiteCaseCounts', () => {
     expect(groupBy).toHaveBeenCalledTimes(2);
   });
 
+  it('counts only active cases when asked to', async () => {
+    const groupBy = jest.fn().mockResolvedValue([]);
+
+    await readSuiteCaseCounts({ testCase: { groupBy } }, ['suite-1'], {
+      activeOnly: true,
+    });
+
+    expect(groupBy).toHaveBeenCalledWith({
+      by: ['suiteId'],
+      where: { suiteId: { in: ['suite-1'] }, state: 'active' },
+      _count: { _all: true },
+    });
+  });
+
   it('does not read when there are no suite ids', async () => {
     const groupBy = jest.fn().mockResolvedValue([group('suite-1', 4)]);
 
