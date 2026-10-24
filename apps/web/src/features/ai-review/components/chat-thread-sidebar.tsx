@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, SidebarSimple, Trash, X } from '@phosphor-icons/react'
+import { ClockCounterClockwise, Plus, Trash, X } from '@phosphor-icons/react'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
@@ -54,10 +54,12 @@ export function ChatThreadSidebar({
           : 'transition-[width] duration-200 ease-out-quart motion-reduce:transition-none',
         // The rail drops its border instead of making it transparent: the
         // unlayered base border-color in globals.css outranks border-transparent.
-        !isDrawer && (isRail ? 'w-14 border-r-0' : 'w-64 border-r border-border'),
+        !isDrawer && (isRail ? 'w-18 border-r-0' : 'w-64 border-r border-border'),
       )}
     >
-      <div className="flex h-14 shrink-0 items-center gap-1 px-2.5">
+      {/* On the rail the button starts 18px in, the same column as the app
+          sidebar toggle in the top bar (px-6 less its -ml-1.5). */}
+      <div className={cn('flex h-14 shrink-0 items-center gap-1', isRail ? 'px-4.5' : 'px-2.5')}>
         {isRail ? (
           onToggleCollapse && (
             <button
@@ -69,9 +71,10 @@ export function ChatThreadSidebar({
               title={t('aiReview.expandSidebar')}
               className={iconButtonClass}
             >
-              {/* A plain control, not the Aeris mark: the app's own logo sits
-                  right above the rail, and two marks stacked read as two products. */}
-              <SidebarSimple size={18} aria-hidden="true" />
+              {/* History, not the usual panel icon: the app's own sidebar toggle
+                  sits right above with that icon, and two identical toggles
+                  leave the user guessing which panel each one opens. */}
+              <ClockCounterClockwise size={18} aria-hidden="true" />
               <span className="sr-only">{t('aiReview.expandSidebar')}</span>
             </button>
           )
@@ -105,7 +108,7 @@ export function ChatThreadSidebar({
                 title={t('aiReview.collapseSidebar')}
                 className={iconButtonClass}
               >
-                <SidebarSimple size={18} aria-hidden="true" />
+                <ClockCounterClockwise size={18} aria-hidden="true" />
               </button>
             )}
           </>
