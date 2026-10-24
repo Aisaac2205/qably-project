@@ -74,9 +74,11 @@ export function Sidebar() {
 
   const inReviewCount = useInboxPendingCount()
 
+  // The route alone decides the project context, so a reload shows the project
+  // navigation at once; only the project name waits for the request.
   const projectId = useProjectRouteId()
   const { project } = useProject(projectId ?? '')
-  const projectContext = project ? projectId : null
+  const projectContext = projectId
 
   // Route changes on mobile should dismiss the sheet — otherwise it stays
   // open over the newly navigated page until the user closes it manually.
@@ -148,15 +150,20 @@ export function Sidebar() {
 
       <SidebarContent>
         {/* The project identity also serves as the only route back to global projects. */}
-        {projectContext && project && (
+        {projectContext && (
           <SidebarGroup className="px-2 pt-2">
             <Link
               href="/projects"
-              aria-label={`${t('sidebar.projects')}: ${project.name}`}
+              aria-label={project ? `${t('sidebar.projects')}: ${project.name}` : t('sidebar.projects')}
               className="flex min-h-9 items-center gap-1.5 px-2 text-sm font-medium text-sidebar-fg-muted transition-colors duration-150 hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               <CaretLeft size={18} weight="bold" aria-hidden="true" />
-              {!isCollapsed && <span className="truncate">{project.name}</span>}
+              {!isCollapsed &&
+                (project ? (
+                  <span className="truncate">{project.name}</span>
+                ) : (
+                  <span aria-hidden="true" className="h-3.5 w-24 animate-pulse rounded bg-sidebar-hover motion-reduce:animate-none" />
+                ))}
             </Link>
             <SidebarGroupContent>
               <SidebarMenu>

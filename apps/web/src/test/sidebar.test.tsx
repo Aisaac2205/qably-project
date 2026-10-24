@@ -278,6 +278,14 @@ describe('Sidebar — project state (inside /projects/proj-1/...)', () => {
     expect(screen.queryByText('Notifications')).not.toBeInTheDocument()
     expect(screen.queryByText('Settings')).not.toBeInTheDocument()
   })
+
+  it('shows the project navigation before the project itself has loaded', async () => {
+    mockPathname.mockReturnValue('/projects/proj-loading/suites')
+    await act(async () => { renderSidebar() })
+    expect(screen.getByText('Repository').closest('a')).toHaveAttribute('href', '/projects/proj-loading/repository')
+    expect(screen.queryByText('Review Inbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects')
+  })
 })
 
 describe('Sidebar — current destinations', () => {
