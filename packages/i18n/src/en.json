@@ -743,7 +743,6 @@
     "sendMessage": "Send message",
     "draftCaseCreated": "Draft case created",
     "viewInReviewQueue": "View in Review Queue",
-    "chatEmptyHint": "Ask anything about this project’s suites, cases, or coverage.",
     "newChat": "New chat",
     "chatGreeting": "Hello, how can I help you today?",
     "deleteChatTitle": "Delete conversation",
@@ -853,17 +852,7 @@
     "chatProposedEvidence": "Proposed evidence:",
     "chatReplyCopied": "Copied",
     "chatStopReply": "Stop the reply",
-    "chatScrollToLatest": "Scroll to the latest message",
-    "chatSuggestionsLabel": "Suggested questions",
-    "chatSuggestionThinSuiteTitle": "Thinnest suite",
-    "chatSuggestionThinSuiteLabel": "Find the suite with the fewest cases",
-    "chatSuggestionThinSuitePrompt": "Which suite has the fewest test cases, and how many does it have?",
-    "chatSuggestionRecentRunsTitle": "Recent runs",
-    "chatSuggestionRecentRunsLabel": "Summarize the latest results",
-    "chatSuggestionRecentRunsPrompt": "Summarize the most recent test runs and point out the ones that did not pass.",
-    "chatSuggestionCoverageGapsTitle": "Coverage gaps",
-    "chatSuggestionCoverageGapsLabel": "Spot areas with little or no coverage",
-    "chatSuggestionCoverageGapsPrompt": "Looking at the suites and case titles, which areas of this project look least covered?"
+    "chatScrollToLatest": "Scroll to the latest message"
   },
   "reviewFlow": {
     "provenance": "Provenance",

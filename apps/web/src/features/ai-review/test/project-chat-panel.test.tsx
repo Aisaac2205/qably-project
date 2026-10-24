@@ -4,7 +4,6 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { ApiError } from '@/lib/api-client'
 import { ChatStreamError } from '@/features/ai-review/lib/chat-stream'
 import {
-  ASSISTANT_MODEL_NAME,
   type ChatThreadDetailRecord,
   type Suite,
 } from '@qably/types'
@@ -107,7 +106,7 @@ describe('ProjectChatPanel', () => {
     const user = userEvent.setup()
 
     await renderPanel()
-    expect(screen.getByText(/how can I help you today/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /how can I help you today/i })).toBeInTheDocument()
 
     const textarea = screen.getByRole('textbox', { name: 'Message' })
     await user.type(textarea, 'How many cases are pending?{enter}')
@@ -135,7 +134,7 @@ describe('ProjectChatPanel', () => {
 
     await renderPanel()
 
-    const chip = screen.getByText(ASSISTANT_MODEL_NAME)
+    const chip = screen.getByText('Aeris')
     expect(chip).toBeInTheDocument()
     expect(chip.parentElement).toHaveTextContent(/model|modelo/i)
   })
@@ -317,41 +316,17 @@ describe('ProjectChatPanel', () => {
       await openThread(user)
 
       expect(await screen.findByText(/loading the conversation/i)).toBeInTheDocument()
-      expect(screen.queryByText(/how can I help you today/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /how can I help you today/i })).not.toBeInTheDocument()
     })
 
-    it('greets with a hint and suggested questions grounded in the project data', async () => {
+    it('greets without suggested questions, leaving the composer as the only way in', async () => {
       listThreads.mockResolvedValue([])
 
       await renderPanel()
 
-      expect(screen.getByText(/how can I help you today/i)).toBeInTheDocument()
-      expect(screen.getByText(/ask anything/i)).toBeInTheDocument()
-      const suggestions = screen.getByRole('group', { name: /suggested questions/i })
-      expect(within(suggestions).getAllByRole('button')).toHaveLength(3)
-      expect(within(suggestions).getByRole('button', { name: /thinnest suite/i })).toBeInTheDocument()
-      expect(within(suggestions).getByRole('button', { name: /recent runs/i })).toBeInTheDocument()
-      expect(within(suggestions).getByRole('button', { name: /coverage gaps/i })).toBeInTheDocument()
-    })
-
-    it('sends a suggested question as the first message', async () => {
-      listThreads.mockResolvedValue([])
-      createThread.mockResolvedValue(chatThread)
-      streamMessage.mockResolvedValue({ userMessage: question, assistantMessage: reply })
-      getThread.mockResolvedValue(threadDetailAfterReply)
-      const user = userEvent.setup()
-
-      await renderPanel()
-      await user.click(screen.getByRole('button', { name: /thinnest suite/i }))
-
-      await waitFor(() =>
-        expect(streamMessage).toHaveBeenCalledWith(
-          'proj-1',
-          'thread-1',
-          { content: 'Which suite has the fewest test cases, and how many does it have?', caseIds: [] },
-          expect.anything(),
-        ),
-      )
+      expect(screen.getByRole('heading', { name: /how can I help you today/i })).toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: /suggested questions/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Message' })).toBeInTheDocument()
     })
   })
 
@@ -539,12 +514,12 @@ describe('ProjectChatPanel', () => {
       const reply = replyText.closest('[data-author="assistant"]') as HTMLElement
       expect(reply).not.toBeNull()
       expect(within(reply).getByText(/aeris said/i)).toHaveClass('sr-only')
-      expect(within(reply).queryByText(ASSISTANT_MODEL_NAME)).not.toBeInTheDocument()
+      expect(within(reply).queryByText('Aeris')).not.toBeInTheDocument()
       for (let node: HTMLElement | null = replyText; node !== null && node !== reply; node = node.parentElement) {
         expect(node.className).not.toMatch(/\b(border|bg-surface|rounded-2xl)\b/)
       }
       // The composer chip is now the only place the model is named.
-      expect(screen.getAllByText(ASSISTANT_MODEL_NAME)).toHaveLength(1)
+      expect(screen.getAllByText('Aeris')).toHaveLength(1)
     })
 
     it('shows a question as a compact right-aligned bubble, attributed to the user for a screen reader', async () => {
@@ -564,7 +539,7 @@ describe('ProjectChatPanel', () => {
       expect(bubble).toHaveClass('bg-surface')
       expect(bubble).not.toHaveClass('bg-primary')
       expect(bubble.className).toMatch(/max-w-3\/4/)
-      expect(question).not.toHaveTextContent(ASSISTANT_MODEL_NAME)
+      expect(question).not.toHaveTextContent('Aeris')
     })
 
     it('copies an assistant reply to the clipboard', async () => {

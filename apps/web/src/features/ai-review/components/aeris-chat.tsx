@@ -1,14 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  AssistantRuntimeProvider,
-  AuiConfig,
-  SuggestionPrimitive,
-  Suggestions,
-  ThreadPrimitive,
-} from '@assistant-ui/react'
-import { ArrowDown, ArrowRight } from '@phosphor-icons/react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
+import { AssistantRuntimeProvider, ThreadPrimitive } from '@assistant-ui/react'
+import { ArrowDown } from '@phosphor-icons/react'
 import type { AttachedCaseRecord } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { StateView } from '@/components/ui/state-view'
@@ -67,42 +61,28 @@ function PendingNotice({ pendingMessage }: { pendingMessage: PendingMessage | nu
   return null
 }
 
+// Matches the composer's travel: quick, and settling instead of stopping.
+const COMPOSER_MOVE = { duration: 240, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }
+
 function AerisGreeting() {
   const { t } = useTranslation()
+  const words = t('aiReview.chatGreeting').split(' ')
 
+  // Pushed down by mt-auto so that, with the composer's mb-auto, the pair sits
+  // in the middle of an empty chat. The words rise in one after another.
   return (
-    <div className="m-auto flex w-full max-w-xl flex-col items-center gap-6 p-6 text-center sm:p-8">
-      <AerisIcon className="size-11 shrink-0 sm:size-12" />
-      <div className="space-y-1.5">
-        <h2 className="text-lg font-semibold tracking-tight text-balance text-default sm:text-xl">
-          {t('aiReview.chatGreeting')}
-        </h2>
-        <p className="text-sm text-pretty text-muted">{t('aiReview.chatEmptyHint')}</p>
-      </div>
-      <div
-        role="group"
-        aria-label={t('aiReview.chatSuggestionsLabel')}
-        className="w-full divide-y divide-border overflow-hidden rounded-xl border border-border text-left"
-      >
-        <ThreadPrimitive.Suggestions>
-          {() => (
-            <SuggestionPrimitive.Trigger
-              send
-              className="group flex w-full cursor-pointer items-center gap-3 bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <SuggestionPrimitive.Title className="text-sm font-medium text-default" />
-                <SuggestionPrimitive.Description className="text-xs text-muted" />
-              </span>
-              <ArrowRight
-                size={14}
-                aria-hidden="true"
-                className="shrink-0 text-muted transition-transform duration-150 ease-out group-hover:translate-x-0.5"
-              />
-            </SuggestionPrimitive.Trigger>
-          )}
-        </ThreadPrimitive.Suggestions>
-      </div>
+    <div className="mt-auto flex w-full flex-col items-center gap-4 px-4 pb-5 text-center sm:gap-5 sm:pb-6">
+      <AerisIcon className="size-9 animate-page-enter sm:size-10" />
+      <h2 className="max-w-xl text-2xl font-semibold tracking-tight text-balance text-default sm:text-3xl">
+        {words.map((word, index) => (
+          <Fragment key={index}>
+            {index > 0 && ' '}
+            <span className="inline-block animate-page-enter" style={{ animationDelay: `${60 + index * 40}ms` }}>
+              {word}
+            </span>
+          </Fragment>
+        ))}
+      </h2>
     </div>
   )
 }
@@ -134,35 +114,34 @@ export function AerisChat({
       setAttachedFilePath(null)
     },
   })
-  // Prompts the assistant can answer from the project data it is always given:
-  // suite names with their case counts, active case titles and recent runs.
-  const config = AuiConfig({
-    suggestions: Suggestions([
-      {
-        title: t('aiReview.chatSuggestionThinSuiteTitle'),
-        label: t('aiReview.chatSuggestionThinSuiteLabel'),
-        prompt: t('aiReview.chatSuggestionThinSuitePrompt'),
-      },
-      {
-        title: t('aiReview.chatSuggestionRecentRunsTitle'),
-        label: t('aiReview.chatSuggestionRecentRunsLabel'),
-        prompt: t('aiReview.chatSuggestionRecentRunsPrompt'),
-      },
-      {
-        title: t('aiReview.chatSuggestionCoverageGapsTitle'),
-        label: t('aiReview.chatSuggestionCoverageGapsLabel'),
-        prompt: t('aiReview.chatSuggestionCoverageGapsPrompt'),
-      },
-    ]),
-  })
-
   const { messages, pendingMessage, isRunning } = chat
   const isEmpty = messages.length === 0 && pendingMessage === null && !isRunning
+  const isCentered = isEmpty && !isLoadingThread
   const lastReplyId = messages.findLast((message) => message.role === 'assistant')?.id
+  const footerRef = useRef<HTMLDivElement>(null)
+  const footerTopRef = useRef<number | null>(null)
+
+  // The composer starts in the middle of an empty chat and drops to the bottom
+  // once the first message lands, or rises back on a new chat. Slide it from
+  // where it was so the eye follows the bar instead of losing it.
+  useLayoutEffect(() => {
+    const footer = footerRef.current
+    if (!footer) return
+    const top = footer.getBoundingClientRect().top
+    const previousTop = footerTopRef.current
+    footerTopRef.current = top
+    if (previousTop === null || Math.abs(previousTop - top) < 1) return
+    if (typeof footer.animate !== 'function') return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    footer.animate(
+      [{ transform: `translateY(${previousTop - top}px)` }, { transform: 'translateY(0)' }],
+      COMPOSER_MOVE,
+    )
+  }, [isCentered])
 
   return (
-    <AssistantRuntimeProvider runtime={runtime} config={config}>
-      <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col">
+    <AssistantRuntimeProvider runtime={runtime}>
+      <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col bg-surface">
         <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {isEmpty && isLoadingThread ? (
             <StateView kind="loading" title={t('aiReview.chatLoadingThread')} className="m-auto" />
@@ -188,7 +167,10 @@ export function AerisChat({
             {lastReplyId !== undefined && <span key={lastReplyId}>{t('aiReview.newAssistantReply')}</span>}
           </div>
 
-          <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mt-auto">
+          <ThreadPrimitive.ViewportFooter
+            ref={footerRef}
+            className={cn(isCentered ? 'mb-auto pb-16 sm:pb-24' : 'sticky bottom-0 mt-auto')}
+          >
             <ThreadPrimitive.ScrollToBottom
               aria-label={t('aiReview.chatScrollToLatest')}
               title={t('aiReview.chatScrollToLatest')}

@@ -14,8 +14,12 @@ import { ChatFileChip } from './chat-file-chip'
 
 const MAX_MESSAGE_LENGTH = 4000
 
+// The composer names the assistant by its brand alone; the versioned model name
+// stays one hover away.
+const ASSISTANT_NAME = 'Aeris'
+
 const toolButtonClass =
-  'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-hover hover:text-default focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 md:size-7'
+  'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition duration-150 ease-out-quart hover:bg-surface-hover hover:text-default active:scale-95 focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 md:size-7'
 
 const primaryActionClass =
   'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-fg transition duration-150 ease-out hover:bg-primary-hover active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted disabled:active:scale-100 md:size-8'
@@ -100,9 +104,9 @@ export function AerisComposer({
   }
 
   return (
-    // The strip matches the page so replies scroll out of sight behind it; the
+    // The strip matches the chat so replies scroll out of sight behind it; the
     // pill is the only surface the composer draws.
-    <div className="bg-canvas px-3 pt-2 pb-3 sm:px-6 sm:pb-4">
+    <div className="bg-surface px-3 pt-2 pb-3 sm:px-6 sm:pb-4">
       <ComposerPrimitive.Root className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-3xl border border-border bg-surface px-4 pt-3 pb-2.5 transition-colors focus-within:border-border-strong hover:border-border-strong">
         {(attachedCases.length > 0 || attachedFilePath !== null) && (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -184,12 +188,6 @@ export function AerisComposer({
 
         <div className="-mx-1.5 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1">
-            <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-muted">
-              <AerisIcon size={14} />
-              <span className="sr-only">{t('aiReview.modelLabel')}: </span>
-              <span className="truncate">{ASSISTANT_MODEL_NAME}</span>
-            </p>
-
             <button
               type="button"
               onClick={() => setPickerOpen(true)}
@@ -223,25 +221,33 @@ export function AerisComposer({
             )}
           </div>
 
-          <AuiIf condition={(state) => !state.thread.isRunning}>
-            <ComposerPrimitive.Send aria-label={t('aiReview.sendMessage')} className={primaryActionClass}>
-              <PaperPlaneRight size={16} weight="fill" aria-hidden="true" />
-            </ComposerPrimitive.Send>
-          </AuiIf>
-          <AuiIf condition={(state) => state.thread.isRunning}>
-            <ComposerPrimitive.Cancel
-              aria-label={t('aiReview.chatStopReply')}
-              className={primaryActionClass}
-              onFocus={() => {
-                stopHadFocusRef.current = true
-              }}
-              onBlur={(event) => {
-                if (event.relatedTarget !== null) stopHadFocusRef.current = false
-              }}
-            >
-              <Stop size={14} weight="fill" aria-hidden="true" />
-            </ComposerPrimitive.Cancel>
-          </AuiIf>
+          <div className="flex shrink-0 items-center gap-2.5">
+            <p title={ASSISTANT_MODEL_NAME} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted">
+              <AerisIcon size={16} />
+              <span className="sr-only">{t('aiReview.modelLabel')}: </span>
+              <span>{ASSISTANT_NAME}</span>
+            </p>
+
+            <AuiIf condition={(state) => !state.thread.isRunning}>
+              <ComposerPrimitive.Send aria-label={t('aiReview.sendMessage')} className={primaryActionClass}>
+                <PaperPlaneRight size={16} weight="fill" aria-hidden="true" />
+              </ComposerPrimitive.Send>
+            </AuiIf>
+            <AuiIf condition={(state) => state.thread.isRunning}>
+              <ComposerPrimitive.Cancel
+                aria-label={t('aiReview.chatStopReply')}
+                className={primaryActionClass}
+                onFocus={() => {
+                  stopHadFocusRef.current = true
+                }}
+                onBlur={(event) => {
+                  if (event.relatedTarget !== null) stopHadFocusRef.current = false
+                }}
+              >
+                <Stop size={14} weight="fill" aria-hidden="true" />
+              </ComposerPrimitive.Cancel>
+            </AuiIf>
+          </div>
         </div>
       </ComposerPrimitive.Root>
 
