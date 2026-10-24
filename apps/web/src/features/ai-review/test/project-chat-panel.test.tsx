@@ -532,7 +532,8 @@ describe('ProjectChatPanel', () => {
       expect(within(question).getByText(/you said/i)).toHaveClass('sr-only')
       const bubble = questionText.closest('.rounded-3xl') as HTMLElement
       expect(bubble).not.toBeNull()
-      expect(bubble).toHaveClass('bg-surface')
+      expect(bubble).toHaveClass('bg-canvas')
+      expect(bubble).not.toHaveClass('border')
       expect(bubble).not.toHaveClass('bg-primary')
       expect(bubble.className).toMatch(/max-w-3\/4/)
       expect(question).not.toHaveTextContent('Aeris')

@@ -43,7 +43,7 @@ export function AerisUserMessage() {
       )}
       {/* A 24px radius on a one-line bubble (about 40px tall) clamps to a full
           pill; longer questions keep the same soft corners. */}
-      <div className="max-w-3/4 rounded-3xl border border-border bg-surface px-4 py-2.5 text-sm text-default">
+      <div className="max-w-3/4 rounded-3xl bg-canvas px-4 py-2.5 text-sm text-default">
         <MessagePrimitive.Parts components={{ Text: UserText, data: hideDataParts }} />
       </div>
     </MessagePrimitive.Root>
