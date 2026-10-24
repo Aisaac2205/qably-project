@@ -41,7 +41,7 @@ function pendingErrorCopy(errorKind: PendingMessage['errorKind'], t: Translate):
 }
 
 const noticeClass =
-  'max-w-5/6 self-start rounded-2xl rounded-tl-xs border px-4 py-2.5 text-sm sm:max-w-4/5'
+  'max-w-3/4 self-start rounded-xl border px-4 py-2.5 text-sm'
 
 function PendingNotice({ pendingMessage }: { pendingMessage: PendingMessage | null }) {
   const { t } = useTranslation()

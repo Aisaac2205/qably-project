@@ -39,7 +39,7 @@ function AerisCodeBlock({ code, language }: SyntaxHighlighterProps) {
   const highlighted = useMemo(() => highlight(code, language), [code, language])
 
   return (
-    <div className="my-3 overflow-hidden rounded-lg border border-border bg-canvas first:mt-0 last:mb-0">
+    <div className="my-3 overflow-hidden rounded-lg border border-border bg-surface first:mt-0 last:mb-0">
       {language !== '' && language !== 'unknown' && (
         <p className="border-b border-border px-3 py-1.5 font-mono text-xs text-muted">{language}</p>
       )}
@@ -60,7 +60,7 @@ function InlineCode({ node: _node, className, ...props }: MarkdownProps<'code'>)
   return (
     <code
       className={cn(
-        !isCodeBlock && 'rounded bg-canvas px-1 py-0.5 font-mono text-xs text-default',
+        !isCodeBlock && 'rounded border border-border bg-surface px-1 py-0.5 font-mono text-xs text-default',
         className,
       )}
       {...props}
@@ -108,7 +108,7 @@ const markdownComponents = {
   ),
   table: ({ node: _node, className, ...props }: MarkdownProps<'table'>) => (
     <div className="my-3 overflow-x-auto first:mt-0 last:mb-0">
-      <table className={cn('w-full border-collapse text-xs', className)} {...props} />
+      <table className={cn('w-full border-collapse bg-surface text-xs', className)} {...props} />
     </div>
   ),
   th: ({ node: _node, className, ...props }: MarkdownProps<'th'>) => (

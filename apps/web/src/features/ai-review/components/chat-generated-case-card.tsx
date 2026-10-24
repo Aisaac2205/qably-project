@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { FileCode } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { AttachedCaseRecord, SuggestedCaseRecord } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
@@ -65,7 +66,9 @@ export function ChatGeneratedCaseCard({
   const isBlocked = state === 'error' && errorKind === 'no-code-evidence'
 
   return (
-    <div className="rounded-lg border border-ai/30 bg-ai-bg p-3 mt-2 space-y-2">
+    // An attachment of the reply above it: a plain bordered surface, so the
+    // AI tint marks only its header.
+    <div className="space-y-2 rounded-xl border border-border bg-surface p-3">
       <div className="flex items-center gap-1.5 text-xs font-semibold text-ai">
         <AerisIcon size={14} />
         {isSent ? t('aiReview.chatProposalSent') : t('aiReview.chatProposalReady')}
@@ -80,8 +83,8 @@ export function ChatGeneratedCaseCard({
       )}
 
       {suggestedCase.targetTestCaseId !== undefined && (
-        <div className="space-y-1.5 rounded-md border border-ai/20 bg-surface/60 p-2.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+        <div className="space-y-1.5 rounded-lg bg-canvas p-2.5">
+          <p className="text-xs font-semibold text-muted">
             {t('aiReview.chatWhatAerisProposes')}
           </p>
           <dl className="space-y-1 text-xs text-default">
@@ -103,6 +106,16 @@ export function ChatGeneratedCaseCard({
             </div>
           </dl>
         </div>
+      )}
+
+      {suggestedCase.evidencePath !== undefined && (
+        <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted">
+          <FileCode size={14} aria-hidden="true" className="mt-px shrink-0" />
+          <span className="min-w-0">
+            {t('aiReview.chatProposedEvidence')}{' '}
+            <code className="font-mono break-all text-default">{suggestedCase.evidencePath}</code>
+          </span>
+        </p>
       )}
 
       {isSent ? (

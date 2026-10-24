@@ -221,4 +221,38 @@ describe('ChatGeneratedCaseCard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/attach a case or reference a file/i)
     expect(screen.getByRole('button', { name: 'Send to review' })).toBeDisabled()
   })
+  it('names the repository file Aeris proposes as evidence, in monospace', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={{ ...suggestedCase, evidencePath: 'e2e/auth/login-2fa.spec.ts' }}
+        />,
+      )
+    })
+
+    const path = screen.getByText('e2e/auth/login-2fa.spec.ts')
+    expect(path.tagName).toBe('CODE')
+    expect(path).toHaveClass('font-mono')
+    expect(path.parentElement).toHaveTextContent(/proposed evidence/i)
+  })
+
+  it('shows no proposed evidence line when Aeris proposes no file', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={suggestedCase}
+        />,
+      )
+    })
+
+    expect(screen.queryByText(/proposed evidence/i)).not.toBeInTheDocument()
+  })
 })

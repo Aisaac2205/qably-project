@@ -527,7 +527,7 @@ describe('ProjectChatPanel', () => {
       expect(code.querySelector('[style*="--sh-keyword"]')).toHaveTextContent('const')
     })
 
-    it('names the model on every assistant reply and leaves the question unattributed', async () => {
+    it('shows a reply as plain text with no card or model label, attributed to Aeris for a screen reader', async () => {
       listThreads.mockResolvedValue([chatThread])
       getThread.mockResolvedValue(threadDetailAfterReply)
       const user = userEvent.setup()
@@ -536,10 +536,35 @@ describe('ProjectChatPanel', () => {
       await openThread(user)
 
       const replyText = await screen.findByText('There are 4 cases pending review.')
-      const replyBubble = replyText.closest('.rounded-2xl') as HTMLElement
-      expect(within(replyBubble).getByText(ASSISTANT_MODEL_NAME)).toBeInTheDocument()
-      const questionBubble = screen.getByText('How many cases are pending?', { selector: 'p' }).closest('.rounded-2xl') as HTMLElement
-      expect(questionBubble).not.toHaveTextContent(ASSISTANT_MODEL_NAME)
+      const reply = replyText.closest('[data-author="assistant"]') as HTMLElement
+      expect(reply).not.toBeNull()
+      expect(within(reply).getByText(/aeris said/i)).toHaveClass('sr-only')
+      expect(within(reply).queryByText(ASSISTANT_MODEL_NAME)).not.toBeInTheDocument()
+      for (let node: HTMLElement | null = replyText; node !== null && node !== reply; node = node.parentElement) {
+        expect(node.className).not.toMatch(/\b(border|bg-surface|rounded-2xl)\b/)
+      }
+      // The composer chip is now the only place the model is named.
+      expect(screen.getAllByText(ASSISTANT_MODEL_NAME)).toHaveLength(1)
+    })
+
+    it('shows a question as a compact right-aligned bubble, attributed to the user for a screen reader', async () => {
+      listThreads.mockResolvedValue([chatThread])
+      getThread.mockResolvedValue(threadDetailAfterReply)
+      const user = userEvent.setup()
+
+      await renderPanel()
+      await openThread(user)
+
+      const questionText = await screen.findByText('How many cases are pending?', { selector: 'p' })
+      const question = questionText.closest('[data-author="user"]') as HTMLElement
+      expect(question).toHaveClass('items-end')
+      expect(within(question).getByText(/you said/i)).toHaveClass('sr-only')
+      const bubble = questionText.closest('.rounded-3xl') as HTMLElement
+      expect(bubble).not.toBeNull()
+      expect(bubble).toHaveClass('bg-surface')
+      expect(bubble).not.toHaveClass('bg-primary')
+      expect(bubble.className).toMatch(/max-w-3\/4/)
+      expect(question).not.toHaveTextContent(ASSISTANT_MODEL_NAME)
     })
 
     it('copies an assistant reply to the clipboard', async () => {

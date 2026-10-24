@@ -15,10 +15,10 @@ import { ChatFileChip } from './chat-file-chip'
 const MAX_MESSAGE_LENGTH = 4000
 
 const toolButtonClass =
-  'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-hover hover:text-default focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 md:size-7'
+  'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-hover hover:text-default focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 md:size-7'
 
 const primaryActionClass =
-  'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-primary text-primary-fg transition duration-150 ease-out hover:bg-primary-hover active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted disabled:active:scale-100 md:size-8'
+  'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-fg transition duration-150 ease-out hover:bg-primary-hover active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted disabled:active:scale-100 md:size-8'
 
 export function AerisComposer({
   projectId,
@@ -100,8 +100,10 @@ export function AerisComposer({
   }
 
   return (
-    <div className="bg-surface px-3 pt-2 pb-3 sm:px-6 sm:pb-4">
-      <ComposerPrimitive.Root className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-2xl border border-border bg-surface p-3 transition-colors focus-within:border-border-strong hover:border-border-strong">
+    // The strip matches the page so replies scroll out of sight behind it; the
+    // pill is the only surface the composer draws.
+    <div className="bg-canvas px-3 pt-2 pb-3 sm:px-6 sm:pb-4">
+      <ComposerPrimitive.Root className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-3xl border border-border bg-surface px-4 pt-3 pb-2.5 transition-colors focus-within:border-border-strong hover:border-border-strong">
         {(attachedCases.length > 0 || attachedFilePath !== null) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {attachedCases.map((attachedCase) => (
@@ -136,7 +138,7 @@ export function AerisComposer({
                 placeholder={t('aiReview.chatFilePathPlaceholder')}
                 aria-invalid={filePathInputError}
                 aria-describedby={filePathInputError ? 'aeris-composer-file-path-error' : undefined}
-                className="h-8 w-full min-w-0 rounded-lg border border-border bg-canvas px-2 font-mono text-xs text-default outline-none placeholder:font-sans placeholder:text-muted focus-visible:border-primary aria-invalid:border-fail"
+                className="h-8 w-full min-w-0 rounded-full border border-border bg-canvas px-3 font-mono text-xs text-default outline-none placeholder:font-sans placeholder:text-muted focus-visible:border-primary aria-invalid:border-fail"
               />
               <button
                 type="button"
@@ -180,9 +182,9 @@ export function AerisComposer({
           className="w-full resize-none bg-transparent text-sm text-default outline-none placeholder:text-muted"
         />
 
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <p className="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-border bg-canvas px-2 py-1 text-xs font-semibold text-muted">
+        <div className="-mx-1.5 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-muted">
               <AerisIcon size={14} />
               <span className="sr-only">{t('aiReview.modelLabel')}: </span>
               <span className="truncate">{ASSISTANT_MODEL_NAME}</span>
