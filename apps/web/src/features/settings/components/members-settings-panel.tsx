@@ -161,7 +161,7 @@ export function MembersSettingsPanel() {
       ) : members.length === 0 ? (
         <StateView kind="empty" title={t('settings.members.noMembers')} />
       ) : (
-        <Card className="rounded-xl border border-border bg-surface overflow-hidden">
+        <Card className="animate-enter rounded-xl border border-border bg-surface overflow-hidden">
           <CardContent className="p-0">
             <EntityList aria-label={t('settings.members.title')}>
               {members.map((member) => {

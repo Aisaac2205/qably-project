@@ -31,10 +31,10 @@ function SettingsContent() {
   ]
 
   return (
-    <div className="flex flex-col w-full animate-page-enter">
+    <div className="flex flex-col w-full">
       <h1 className="sr-only">{t('settings.title')}</h1>
 
-      <div className="border-b border-border/80 px-4 sm:px-6 lg:px-8 pt-4 pb-0">
+      <div className="animate-enter border-b border-border/80 px-4 sm:px-6 lg:px-8 pt-4 pb-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <p className="text-xs text-muted max-w-2xl">
             {t('settings.subtitle')}
@@ -67,7 +67,7 @@ function SettingsContent() {
         </div>
       </div>
 
-      <div className="space-y-6 px-4 sm:px-6 lg:px-8 py-6">
+      <div className="animate-stagger space-y-6 px-4 sm:px-6 lg:px-8 py-6">
         {(activeTab === 'all' || activeTab === 'plan') && <PlanUsageSection />}
         {(activeTab === 'all' || activeTab === 'members') && <MembersSettingsPanel />}
         {(activeTab === 'all' || activeTab === 'notifications') && <NotificationPreferencesPanel />}

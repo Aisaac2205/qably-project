@@ -243,7 +243,10 @@ export function ReviewInboxPage() {
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1">
+      {/* Only the workspace enters, once on mount. The feedback stack above
+          toggles display as toasts come and go, and a stagger there would
+          replay on every keyboard decision. */}
+      <div className="min-h-0 flex-1 animate-page-enter">
         <ResizableSplit
           storageKey="review-inbox-split"
           defaultWidth={340}

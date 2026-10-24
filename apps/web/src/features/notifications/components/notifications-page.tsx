@@ -143,7 +143,7 @@ export function NotificationsPage() {
   }
 
   return (
-    <div className="w-full space-y-5 px-4 py-5 sm:px-6 lg:px-8 text-default animate-page-enter">
+    <div className="w-full space-y-5 px-4 py-5 sm:px-6 lg:px-8 text-default animate-stagger">
       <h1 className="sr-only">{t('notifications.title')}</h1>
 
       {/* Header */}

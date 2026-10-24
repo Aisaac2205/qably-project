@@ -113,26 +113,30 @@ export function KpiStrip({ period, projectId }: KpiStripProps) {
 
   return (
     <StripShell label={stripLabel}>
-      <div
-        className={cn(
-          'grid grid-cols-1 gap-3 transition-opacity duration-200 @xs:grid-cols-2 @2xl:grid-cols-4',
-          isRefreshing && 'opacity-60',
-        )}
-      >
-        {cards.map((card) => (
-          <KpiStatCard
-            key={card.metric}
-            label={card.label}
-            value={total(current, card.metric)}
-            series={toSeries(current, card.metric)}
-            tone={card.tone}
-            trend={trendPercent(total(current, card.metric), total(previous, card.metric))}
-            format={{ notation: 'compact', maximumFractionDigits: 1 }}
-            locale={resolveNumberLocale(locale)}
-            formatLabel={formatLabel}
-            chartLabel={t('dashboard.kpiSparklineLabel', { label: card.label })}
-          />
-        ))}
+      {/* The entrance lives on a wrapper so its opacity never fights the
+          grid's refresh dimming below. */}
+      <div className="animate-enter">
+        <div
+          className={cn(
+            'grid grid-cols-1 gap-3 transition-opacity duration-200 @xs:grid-cols-2 @2xl:grid-cols-4',
+            isRefreshing && 'opacity-60',
+          )}
+        >
+          {cards.map((card) => (
+            <KpiStatCard
+              key={card.metric}
+              label={card.label}
+              value={total(current, card.metric)}
+              series={toSeries(current, card.metric)}
+              tone={card.tone}
+              trend={trendPercent(total(current, card.metric), total(previous, card.metric))}
+              format={{ notation: 'compact', maximumFractionDigits: 1 }}
+              locale={resolveNumberLocale(locale)}
+              formatLabel={formatLabel}
+              chartLabel={t('dashboard.kpiSparklineLabel', { label: card.label })}
+            />
+          ))}
+        </div>
       </div>
     </StripShell>
   )

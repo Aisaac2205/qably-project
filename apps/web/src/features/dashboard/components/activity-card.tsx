@@ -55,7 +55,7 @@ export function ActivityCard({ period, projectId }: ActivityCardProps) {
       ) : overview.recentActivity.length === 0 ? (
         <StateView kind="empty" title={t('dashboard.activityEmptyTitle')} />
       ) : (
-        <div className="flex flex-col divide-y divide-border px-5 pb-2">
+        <div className="flex animate-enter flex-col divide-y divide-border px-5 pb-2">
           {overview.recentActivity.map((entry) => (
             <ActivityRow
               key={entry.kind === 'commit' ? `commit:${entry.projectId}:${entry.commitSha}` : entry.runId}

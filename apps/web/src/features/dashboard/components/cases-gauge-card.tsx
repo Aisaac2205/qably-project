@@ -100,7 +100,7 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
             <div
               role="img"
               aria-label={t('dashboard.casesGaugeLabel')}
-              className="relative flex items-center justify-center py-1"
+              className="relative flex animate-enter items-center justify-center py-1"
             >
               <PieChart
                 data={pieData}
@@ -120,6 +120,7 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
               hoveredIndex={hoveredIndex}
               items={legendItems}
               onHoverChange={setHoveredIndex}
+              className="animate-enter"
             >
               <LegendItemComponent>
                 <LegendMarker />

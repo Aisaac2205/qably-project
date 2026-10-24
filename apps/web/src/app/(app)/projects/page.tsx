@@ -5,6 +5,7 @@ import { ProjectGrid } from '@/features/projects/components/project-grid'
 import Link from 'next/link'
 import { Plus } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function ProjectsListPage() {
   const { projects, isLoading } = useProjects()
@@ -13,7 +14,7 @@ export default function ProjectsListPage() {
   const hasProjects = projects.length > 0
 
   return (
-    <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
+    <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-stagger">
       <h1 className="sr-only">{t('projects.title')}</h1>
 
       {/* Top Header Row with Actions & Controls (Rendered when projects exist or loading) */}
@@ -21,9 +22,9 @@ export default function ProjectsListPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4 text-sm">
           <div className="flex items-center gap-3">
             {isLoading ? (
-              <span className="inline-block h-4 w-20 rounded bg-surface-hover animate-pulse" aria-hidden="true" />
+              <Skeleton className="h-4 w-20 rounded" aria-hidden="true" />
             ) : (
-              <span className="font-semibold text-muted-foreground">
+              <span className="animate-enter font-semibold text-muted-foreground">
                 {projects.length} {projects.length === 1 ? t('projects.project_one') : t('projects.project_other')}
               </span>
             )}

@@ -59,7 +59,7 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
       ) : overview.projects.length === 0 ? (
         <StateView kind="empty" title={t('dashboard.projectsEmptyTitle')} />
       ) : (
-        <div className="w-full pb-2">
+        <div className="w-full animate-enter pb-2">
           <table className="w-full table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-border bg-canvas/30 text-sm font-medium text-muted">

@@ -139,7 +139,9 @@ export function ReviewInboxQueue({
           />
         ) : (
           <>
-            <div ref={listRef} tabIndex={-1} className="outline-none">
+            {/* Mounts when the first rows arrive; j/k and selection only
+                change the rows inside, so it never replays on navigation. */}
+            <div ref={listRef} tabIndex={-1} className="animate-enter outline-none">
               <EntityList aria-label={t('reviewInbox.queueTitle')}>
                 {proposals.map((proposal) => (
                   <ReviewQueueRow

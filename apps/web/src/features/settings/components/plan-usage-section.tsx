@@ -113,8 +113,10 @@ export function PlanUsageSection() {
   const PlanIcon = PLAN_ICONS[usage.plan]
   const resetDate = formatCreditsReset(usage.creditsResetAt, locale)
 
+  // This section is itself a slot of the settings stagger, whose rule would
+  // mask `animate-enter` here, so the resolved blocks cascade in instead.
   return (
-    <section className="space-y-5" aria-labelledby="plan-usage-heading">
+    <section className="animate-stagger space-y-5" aria-labelledby="plan-usage-heading">
       <div className="flex flex-wrap items-center gap-2.5">
         <h2 id="plan-usage-heading" className="text-sm font-semibold text-default">
           {t('settings.planUsage.title')}

@@ -5,34 +5,35 @@ import { ProjectCard } from './project-card'
 import Link from 'next/link'
 import { FolderOpen, Plus } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function ProjectCardSkeleton() {
   return (
     <div
       data-slot="project-card-skeleton"
-      className="flex flex-col h-52 rounded-xl bg-surface border border-border/60 p-5 animate-pulse"
+      className="flex flex-col h-52 rounded-xl bg-surface border border-border/60 p-5"
       aria-hidden="true"
     >
       {/* Header Skeleton */}
       <div className="flex items-center justify-between gap-3">
-        <div className="h-4 w-32 rounded bg-surface-hover" />
+        <Skeleton className="h-4 w-32 rounded" />
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="h-5 w-10 rounded-full bg-surface-hover" />
-          <div className="size-6 rounded bg-surface-hover/60" />
+          <Skeleton className="h-5 w-10 rounded-full" />
+          <Skeleton className="size-6 rounded opacity-60" />
         </div>
       </div>
 
       {/* Tech icons Skeleton */}
       <div className="flex-1 flex items-center justify-center gap-2.5">
-        <div className="size-8 rounded-lg bg-surface-hover" />
-        <div className="size-8 rounded-lg bg-surface-hover" />
-        <div className="size-8 rounded-lg bg-surface-hover" />
+        <Skeleton className="size-8 rounded-lg" />
+        <Skeleton className="size-8 rounded-lg" />
+        <Skeleton className="size-8 rounded-lg" />
       </div>
 
       {/* Footer Skeleton */}
       <div className="flex items-center gap-2 border-t border-border/40 pt-3">
-        <div className="size-2 rounded-full bg-surface-hover" />
-        <div className="h-3 w-40 rounded bg-surface-hover" />
+        <Skeleton className="size-2 rounded-full" />
+        <Skeleton className="h-3 w-40 rounded" />
       </div>
     </div>
   )
@@ -67,7 +68,7 @@ export function ProjectGrid() {
 
   if (sorted.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/80 bg-surface/40 px-6 py-16 text-center animate-page-enter">
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/80 bg-surface/40 px-6 py-16 text-center animate-enter">
         <div className="flex size-12 items-center justify-center rounded-xl border border-border/60 bg-surface-raised text-muted">
           <FolderOpen size={24} weight="duotone" aria-hidden="true" />
         </div>
@@ -88,8 +89,10 @@ export function ProjectGrid() {
     )
   }
 
+  // The grid is a direct child of the page's stagger container, whose rule
+  // would mask `animate-enter` here, so the arriving cards cascade instead.
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
       {sorted.map((project) => (
         <ProjectCard key={project.id} project={project} />
       ))}

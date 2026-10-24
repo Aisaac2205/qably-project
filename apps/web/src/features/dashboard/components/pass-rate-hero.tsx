@@ -131,99 +131,103 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
           ) : points.length === 0 ? (
             <StateView kind="empty" title={t('dashboard.heroEmptyLabel')} className="min-h-60" />
           ) : (
-            <div
-              className={cn(
-                'h-60 min-w-0 transition-opacity duration-200',
-                isRefreshing && 'opacity-60',
-              )}
-            >
-              <AreaChart
-                aspectRatio="auto"
-                className="h-full w-full touch-none"
-                data={chartData as unknown as Record<string, unknown>[]}
-                margin={{ top: 16, right: 16, bottom: 44, left: 48 }}
+            // The entrance lives on a wrapper so its opacity never fights the
+            // chart's refresh dimming.
+            <div className="min-w-0 animate-enter">
+              <div
+                className={cn(
+                  'h-60 min-w-0 transition-opacity duration-200',
+                  isRefreshing && 'opacity-60',
+                )}
               >
-                <Grid horizontal />
-                <Area
-                  dataKey="current"
-                  fill={CURRENT_COLOR}
-                  fillOpacity={0.2}
-                  showHighlight
-                  stroke={CURRENT_COLOR}
-                  strokeWidth={2}
-                />
-                {hasBaseline ? (
+                <AreaChart
+                  aspectRatio="auto"
+                  className="h-full w-full touch-none"
+                  data={chartData as unknown as Record<string, unknown>[]}
+                  margin={{ top: 16, right: 16, bottom: 44, left: 48 }}
+                >
+                  <Grid horizontal />
                   <Area
-                    dataKey="previous"
-                    dashArray="5 5"
-                    dashFromIndex={0}
-                    fill={PREVIOUS_COLOR}
-                    fillOpacity={0}
-                    showHighlight={false}
-                    stroke={PREVIOUS_COLOR}
-                    strokeWidth={1.5}
+                    dataKey="current"
+                    fill={CURRENT_COLOR}
+                    fillOpacity={0.2}
+                    showHighlight
+                    stroke={CURRENT_COLOR}
+                    strokeWidth={2}
                   />
-                ) : null}
-                <XAxis />
-                <YAxis formatValue={(value) => formatCompactNumber(value, locale)} />
-                <ChartTooltip
-                  rows={(point) => [
-                    {
-                      color: CURRENT_COLOR,
-                      label: seriesLabels.current,
-                      value: Number(point.current ?? 0),
-                    },
+                  {hasBaseline ? (
+                    <Area
+                      dataKey="previous"
+                      dashArray="5 5"
+                      dashFromIndex={0}
+                      fill={PREVIOUS_COLOR}
+                      fillOpacity={0}
+                      showHighlight={false}
+                      stroke={PREVIOUS_COLOR}
+                      strokeWidth={1.5}
+                    />
+                  ) : null}
+                  <XAxis />
+                  <YAxis formatValue={(value) => formatCompactNumber(value, locale)} />
+                  <ChartTooltip
+                    rows={(point) => [
+                      {
+                        color: CURRENT_COLOR,
+                        label: seriesLabels.current,
+                        value: Number(point.current ?? 0),
+                      },
+                      ...(hasBaseline
+                        ? [
+                            {
+                              color: PREVIOUS_COLOR,
+                              label: seriesLabels.previous,
+                              value: Number(point.previous ?? 0),
+                            },
+                          ]
+                        : []),
+                      {
+                        color: 'var(--qb-chart-pass)',
+                        label: metricLabels.passed,
+                        value: Number(point.passed ?? 0),
+                      },
+                      {
+                        color: 'var(--qb-chart-fail)',
+                        label: metricLabels.failed,
+                        value: Number(point.failed ?? 0),
+                      },
+                      {
+                        color: 'var(--qb-chart-warn)',
+                        label: metricLabels.blocked,
+                        value: Number(point.blocked ?? 0),
+                      },
+                    ]}
+                    showCrosshair
+                    showDots
+                  />
+                </AreaChart>
+
+                <ChartDataTable
+                  caption={t('dashboard.heroLabel')}
+                  rows={points}
+                  rowKey={(point: ExecutedCasesPoint) => point.id}
+                  columns={[
+                    { key: 'day', header: t('dashboard.heroDayLabel'), render: (point) => point.label },
+                    { key: 'current', header: seriesLabels.current, render: (point) => point.current },
                     ...(hasBaseline
                       ? [
                           {
-                            color: PREVIOUS_COLOR,
-                            label: seriesLabels.previous,
-                            value: Number(point.previous ?? 0),
+                            key: 'previous',
+                            header: seriesLabels.previous,
+                            render: (point: ExecutedCasesPoint) => point.previous,
                           },
                         ]
                       : []),
-                    {
-                      color: 'var(--qb-chart-pass)',
-                      label: metricLabels.passed,
-                      value: Number(point.passed ?? 0),
-                    },
-                    {
-                      color: 'var(--qb-chart-fail)',
-                      label: metricLabels.failed,
-                      value: Number(point.failed ?? 0),
-                    },
-                    {
-                      color: 'var(--qb-chart-warn)',
-                      label: metricLabels.blocked,
-                      value: Number(point.blocked ?? 0),
-                    },
+                    { key: 'passed', header: metricLabels.passed, render: (point) => point.passed },
+                    { key: 'failed', header: metricLabels.failed, render: (point) => point.failed },
+                    { key: 'blocked', header: metricLabels.blocked, render: (point) => point.blocked },
                   ]}
-                  showCrosshair
-                  showDots
                 />
-              </AreaChart>
-
-              <ChartDataTable
-                caption={t('dashboard.heroLabel')}
-                rows={points}
-                rowKey={(point: ExecutedCasesPoint) => point.id}
-                columns={[
-                  { key: 'day', header: t('dashboard.heroDayLabel'), render: (point) => point.label },
-                  { key: 'current', header: seriesLabels.current, render: (point) => point.current },
-                  ...(hasBaseline
-                    ? [
-                        {
-                          key: 'previous',
-                          header: seriesLabels.previous,
-                          render: (point: ExecutedCasesPoint) => point.previous,
-                        },
-                      ]
-                    : []),
-                  { key: 'passed', header: metricLabels.passed, render: (point) => point.passed },
-                  { key: 'failed', header: metricLabels.failed, render: (point) => point.failed },
-                  { key: 'blocked', header: metricLabels.blocked, render: (point) => point.blocked },
-                ]}
-              />
+              </div>
             </div>
           )}
         </CardContent>

@@ -232,7 +232,7 @@ export function ChannelsCard() {
         <StateView kind="empty" title={t('dashboard.channelsEmptyTitle')} />
       ) : (
         <>
-          <div className="flex flex-grow flex-col divide-y divide-border/60">
+          <div className="flex flex-grow animate-enter flex-col divide-y divide-border/60">
             <InAppChannelRow inApp={channels.inApp} />
             {channels.email.enabled ? <EmailChannelRow email={channels.email} /> : null}
             {discordWebhooks.map((webhook) => (
@@ -249,7 +249,7 @@ export function ChannelsCard() {
           </div>
 
           {channels.lastDelivery !== null ? (
-            <CardFooter className="mt-auto flex items-center gap-1.5 border-t border-border/40 pt-3">
+            <CardFooter className="mt-auto flex animate-enter items-center gap-1.5 border-t border-border/40 pt-3">
               {channels.lastDelivery.status === 'failed' ? (
                 <WarningCircle size={13} weight="bold" className="text-status-fail shrink-0" aria-hidden="true" />
               ) : (

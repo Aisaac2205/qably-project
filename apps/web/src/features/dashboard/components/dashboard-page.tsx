@@ -17,7 +17,7 @@ export function DashboardPage() {
   return (
     <section
       aria-label="Dashboard"
-      className="@container w-full space-y-5 px-5 py-6 text-default @md:space-y-6 sm:px-7 lg:px-9 lg:py-6"
+      className="@container w-full animate-stagger space-y-5 px-5 py-6 text-default @md:space-y-6 sm:px-7 lg:px-9 lg:py-6"
     >
       <DashboardHeader
         period={period}
