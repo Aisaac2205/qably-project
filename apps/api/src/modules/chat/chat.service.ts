@@ -295,6 +295,16 @@ function parseChatEvidenceUri(
   return { messageId, caseIndex };
 }
 
+function uniqueNonBlank(
+  values: ReadonlyArray<string | null | undefined>,
+): string[] {
+  const trimmed = values.flatMap((value) => {
+    const candidate = value?.trim();
+    return candidate === undefined || candidate.length === 0 ? [] : [candidate];
+  });
+  return [...new Set(trimmed)];
+}
+
 function threadTitleFrom(content: string): string {
   const firstLine = content.split('\n')[0]?.trim() ?? '';
   return firstLine.length === 0
@@ -738,20 +748,25 @@ export class ChatService {
       orderBy: { createdAt: 'desc' },
       select: { attachedFilePath: true },
     });
-    const filePath = precedingUserMessage?.attachedFilePath?.trim();
-    if (filePath === undefined || filePath.length === 0) {
+    // The file the person attached comes first; the path the assistant proposed
+    // is a fallback. Both go through the same read and evidence gate, so a path
+    // the repository does not back keeps the case gated.
+    const evidencePaths = uniqueNonBlank([
+      precedingUserMessage?.attachedFilePath,
+      suggested.evidencePath,
+    ]);
+    if (evidencePaths.length === 0) {
       return err('no-code-evidence');
     }
 
     const connection = await this.findConnection(projectId);
-    const evidenceResult = await this.buildUntargetedEvidence(
-      filePath,
+    const evidence = await this.firstVerifiedEvidence(
+      evidencePaths,
       connection,
     );
-    if (evidenceResult.kind === 'no-code-evidence') {
+    if (evidence === null) {
       return err('no-code-evidence');
     }
-    const evidence = evidenceResult.evidence;
 
     try {
       const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
@@ -932,6 +947,17 @@ export class ChatService {
     );
 
     return this.toTargetedEvidence(connection.provider, blobUrl, excerpt);
+  }
+
+  private async firstVerifiedEvidence(
+    filePaths: readonly string[],
+    connection: CaseContextConnection | null,
+  ): Promise<TargetedEvidence | null> {
+    for (const filePath of filePaths) {
+      const result = await this.buildUntargetedEvidence(filePath, connection);
+      if (result.kind === 'ok') return result.evidence;
+    }
+    return null;
   }
 
   private async buildUntargetedEvidence(

@@ -157,6 +157,15 @@ describe('buildChatSystemInstruction', () => {
     expect(buildChatSystemInstruction('en')).toMatch(/archive or clean up/i);
   });
 
+  it('tells the assistant to copy, never invent, the repository path backing a new case', () => {
+    expect(buildChatSystemInstruction('es')).toMatch(
+      /"evidencePath"[\s\S]*nunca inventes una ruta/i,
+    );
+    expect(buildChatSystemInstruction('en')).toMatch(
+      /"evidencePath"[\s\S]*never invent a path/i,
+    );
+  });
+
   it('requires every suggested-case field to match the reply locale, not just the reply text (Unit 5 verification, no new behavior)', () => {
     expect(buildChatSystemInstruction('es')).toMatch(
       /cada campo de cada caso/i,

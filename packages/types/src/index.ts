@@ -1144,6 +1144,8 @@ export interface SuggestedCaseRecord {
   expectedResult: string
   priority: CasePriority
   targetTestCaseId?: string
+  /** Repository-relative file the assistant proposed as evidence; verified server-side on send. */
+  evidencePath?: string
 }
 
 export const MAX_ATTACHED_CASES = 5

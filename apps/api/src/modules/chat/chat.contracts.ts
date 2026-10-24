@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { GroundingView } from '@qably/types';
 import { extractedCaseObjectSchema } from '../ai/extraction.contracts';
+import { isSafeEvidencePath } from './chat-evidence-path';
 
-export const CHAT_PROMPT_VERSION = 'chat-v6';
+export const CHAT_PROMPT_VERSION = 'chat-v7';
 export const MAX_SUGGESTED_CASES = 5;
 export const MAX_HISTORY_MESSAGES = 20;
 export const MAX_REPLY_LENGTH = 4000;
@@ -16,6 +17,14 @@ export const suggestedCaseSchema = extractedCaseObjectSchema
   })
   .extend({
     targetTestCaseId: z.string().trim().min(1).optional(),
+    // An unsafe path is dropped rather than failing the case: the case stays,
+    // gated on evidence exactly as if the assistant had proposed no path.
+    evidencePath: z
+      .string()
+      .trim()
+      .refine(isSafeEvidencePath)
+      .optional()
+      .catch(undefined),
   });
 
 export const suggestedCasesSchema = z

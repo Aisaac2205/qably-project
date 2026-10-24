@@ -105,6 +105,7 @@ export const RESPONSE_JSON_SCHEMA = {
             enum: ['critical', 'high', 'medium', 'low'],
           },
           targetTestCaseId: { type: 'string' },
+          evidencePath: { type: 'string' },
         },
         required: ['title', 'objective', 'steps', 'expectedResult', 'priority'],
       },

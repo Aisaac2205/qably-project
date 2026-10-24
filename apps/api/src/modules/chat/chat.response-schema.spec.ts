@@ -39,6 +39,12 @@ describe('RESPONSE_JSON_SCHEMA (chat)', () => {
     ]);
   });
 
+  it('offers an optional, unbounded evidence path per case', () => {
+    expect(
+      RESPONSE_JSON_SCHEMA.properties.cases.items.properties.evidencePath,
+    ).toEqual({ type: 'string' });
+  });
+
   it('requires reply, cases and grounding at the top level', () => {
     expect(RESPONSE_JSON_SCHEMA.required).toEqual([
       'reply',

@@ -803,6 +803,224 @@ describe('ChatService', () => {
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
   });
 
+  describe('evidence path proposed by the assistant', () => {
+    const connectedProject = {
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    };
+
+    function withEvidencePath(
+      evidencePath: string,
+      attachedFilePath: string | null = null,
+    ): FakePrisma {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce({
+          ...assistantRow,
+          suggestedCases: [{ ...suggestedCase, evidencePath }],
+        })
+        .mockResolvedValueOnce({ attachedFilePath });
+      prisma.project.findFirst.mockResolvedValue(connectedProject);
+      return prisma;
+    }
+
+    function send(prisma: FakePrisma, caseContextBuilder: CaseContextBuilder) {
+      return build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+        undefined,
+        caseContextBuilder,
+      ).sendToReview(org, user, 'project-1', 'thread-1', 'message-2', {
+        caseIndex: 0,
+      });
+    }
+
+    const readable = () =>
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: {
+          kind: 'file-head',
+          excerpt: 'test("rejects an expired card", () => {})',
+        },
+      });
+
+    it('sends a case without an attached file once its proposed path is verified in the repo', async () => {
+      const prisma = withEvidencePath('tests/checkout.spec.ts');
+      const caseContextBuilder = fakeCaseContextBuilder(undefined, readable());
+
+      const result = await send(prisma, caseContextBuilder);
+
+      expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+      expect(caseContextBuilder.locateForEvidence).toHaveBeenCalledWith(
+        { automationKey: null, automationFilePath: 'tests/checkout.spec.ts' },
+        connectedProject.connection,
+      );
+      expect(prisma.evidence.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            kind: 'SOURCE_EXCERPT',
+            uri: 'https://github.com/acme/shop/blob/sha123/tests/checkout.spec.ts',
+            excerpt: 'test("rejects an expired card", () => {})',
+          }),
+        }),
+      );
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the case gated when the proposed path cannot be read from the repo', async () => {
+      const prisma = withEvidencePath('tests/missing.spec.ts');
+      const caseContextBuilder = fakeCaseContextBuilder(
+        undefined,
+        jest.fn().mockResolvedValue({
+          ref: 'sha123',
+          excerpt: { kind: 'unavailable', reason: 'http-404' },
+        }),
+      );
+
+      const result = await send(prisma, caseContextBuilder);
+
+      expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('keeps the case gated when the proposed file is empty', async () => {
+      const prisma = withEvidencePath('tests/empty.spec.ts');
+      const caseContextBuilder = fakeCaseContextBuilder(
+        undefined,
+        jest.fn().mockResolvedValue({
+          ref: 'sha123',
+          excerpt: { kind: 'file-head', excerpt: '   ' },
+        }),
+      );
+
+      const result = await send(prisma, caseContextBuilder);
+
+      expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('keeps the case gated when the project has no connected repository', async () => {
+      const prisma = withEvidencePath('tests/checkout.spec.ts');
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: null,
+      });
+      const caseContextBuilder = fakeCaseContextBuilder(undefined, readable());
+
+      const result = await send(prisma, caseContextBuilder);
+
+      expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+      expect(caseContextBuilder.locateForEvidence).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      '../secrets.ts',
+      'tests/../../etc/passwd',
+      '/etc/passwd',
+      'C:/repo/tests/checkout.spec.ts',
+      'https://evil.test/checkout.spec.ts',
+    ])(
+      'rejects the stored untrusted path %j without reading the repo',
+      async (evidencePath) => {
+        const prisma = withEvidencePath(evidencePath);
+        const caseContextBuilder = fakeCaseContextBuilder(
+          undefined,
+          readable(),
+        );
+
+        const result = await send(prisma, caseContextBuilder);
+
+        expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+        expect(caseContextBuilder.locateForEvidence).not.toHaveBeenCalled();
+        expect(prisma.evidence.create).not.toHaveBeenCalled();
+        expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('prefers the file the person attached over the proposed path', async () => {
+      const prisma = withEvidencePath(
+        'tests/checkout.spec.ts',
+        'src/checkout.spec.ts',
+      );
+      const caseContextBuilder = fakeCaseContextBuilder(undefined, readable());
+
+      const result = await send(prisma, caseContextBuilder);
+
+      expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+      expect(caseContextBuilder.locateForEvidence).toHaveBeenCalledTimes(1);
+      expect(caseContextBuilder.locateForEvidence).toHaveBeenCalledWith(
+        { automationKey: null, automationFilePath: 'src/checkout.spec.ts' },
+        connectedProject.connection,
+      );
+    });
+
+    it('falls back to the proposed path when the attached file cannot be read', async () => {
+      const prisma = withEvidencePath(
+        'tests/checkout.spec.ts',
+        'src/missing.ts',
+      );
+      const locate = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ref: 'sha123',
+          excerpt: { kind: 'unavailable', reason: 'http-404' },
+        })
+        .mockResolvedValueOnce({
+          ref: 'sha123',
+          excerpt: { kind: 'file-head', excerpt: 'test("x", () => {})' },
+        });
+      const caseContextBuilder = fakeCaseContextBuilder(undefined, locate);
+
+      const result = await send(prisma, caseContextBuilder);
+
+      expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+      expect(prisma.evidence.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            uri: 'https://github.com/acme/shop/blob/sha123/tests/checkout.spec.ts',
+          }),
+        }),
+      );
+    });
+
+    it('ignores the proposed path on a targeted case, which keeps its own automation file', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst.mockResolvedValueOnce({
+        ...assistantRow,
+        suggestedCases: [
+          {
+            ...suggestedCase,
+            targetTestCaseId: 'case-1',
+            evidencePath: 'tests/other.spec.ts',
+          },
+        ],
+      });
+      prisma.project.findFirst.mockResolvedValue(connectedProject);
+      const caseContextBuilder = fakeCaseContextBuilder();
+
+      await send(prisma, caseContextBuilder);
+
+      expect(caseContextBuilder.locateForEvidence).toHaveBeenCalledWith(
+        containing({ automationFilePath: 'src/checkout.spec.ts' }),
+        connectedProject.connection,
+      );
+      expect(caseContextBuilder.locateForEvidence).not.toHaveBeenCalledWith(
+        containing({ automationFilePath: 'tests/other.spec.ts' }),
+        expect.anything(),
+      );
+    });
+  });
+
   it('is idempotent for a repeated untargeted send via chatCaseKey, even without the legacy evidence uri', async () => {
     const prisma = createPrisma();
     prisma.chatMessage.findFirst.mockReset();
