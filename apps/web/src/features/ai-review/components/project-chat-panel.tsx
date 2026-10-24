@@ -113,7 +113,7 @@ export function ProjectChatPanel({
       </Sheet>
 
       <div className="flex flex-col flex-1 min-w-0 h-full min-h-0">
-        <div className="flex items-center gap-2 shrink-0 border-b border-border bg-surface px-2 py-2 sm:px-4">
+        <div className="flex items-center gap-2 shrink-0 bg-surface px-2 py-2 sm:px-4">
           {onExit && (
             <button
               type="button"

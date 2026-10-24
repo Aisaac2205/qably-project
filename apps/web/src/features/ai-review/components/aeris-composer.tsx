@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AuiIf, ComposerPrimitive, useAuiState } from '@assistant-ui/react'
 import { Check, FileCode, PaperPlaneRight, Paperclip, Stop, X } from '@phosphor-icons/react'
 import { ASSISTANT_MODEL_NAME, isSafeRepoRelativePath, type AttachedCaseRecord } from '@qably/types'
-import { AerisIcon } from '@/components/icons/aeris-icon'
 import { useTranslation } from '@/lib/i18n'
 import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { MAX_ATTACHED_CASES, flattenAttachableCases } from '@/features/ai-review/lib/attachable-cases'
@@ -222,8 +221,7 @@ export function AerisComposer({
           </div>
 
           <div className="flex shrink-0 items-center gap-2.5">
-            <p title={ASSISTANT_MODEL_NAME} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted">
-              <AerisIcon size={16} />
+            <p title={ASSISTANT_MODEL_NAME} className="text-sm font-medium text-muted">
               <span className="sr-only">{t('aiReview.modelLabel')}: </span>
               <span>{ASSISTANT_NAME}</span>
             </p>
