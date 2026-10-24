@@ -43,7 +43,7 @@ export function AerisUserMessage() {
       )}
       {/* A 24px radius on a one-line bubble (about 40px tall) clamps to a full
           pill; longer questions keep the same soft corners. */}
-      <div className="max-w-3/4 rounded-3xl bg-canvas px-4 py-2.5 text-sm text-default">
+      <div className="max-w-3/4 rounded-3xl bg-canvas px-4 py-2.5 text-base text-default">
         <MessagePrimitive.Parts components={{ Text: UserText, data: hideDataParts }} />
       </div>
     </MessagePrimitive.Root>
@@ -121,14 +121,15 @@ export function AerisAssistantMessage({ projectId }: { projectId: string }) {
       {/* The reply sits on the page itself; this label keeps its author known
           to a screen reader now that no visible header names it. */}
       <p className="sr-only">{t('aiReview.chatAssistantAuthor')}</p>
-      <div className="w-full min-w-0 text-sm leading-relaxed text-default">
+      {/* 16px in a max-w-3xl column keeps a line near 80 characters. */}
+      <div className="w-full min-w-0 text-base leading-relaxed text-default">
         <MessagePrimitive.Parts components={{ Text: AerisMarkdownText, data: hideDataParts }} />
         {isRunning && !hasText && <ThinkingIndicator />}
       </div>
 
       {isDeclined && (
-        <p className="inline-flex items-center gap-1 rounded-full border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
-          <Info size={12} aria-hidden="true" />
+        <p className="flex items-center gap-1.5 text-xs text-muted">
+          <Info size={13} aria-hidden="true" className="shrink-0" />
           {t('aiReview.chatGroundingInsufficient')}
         </p>
       )}

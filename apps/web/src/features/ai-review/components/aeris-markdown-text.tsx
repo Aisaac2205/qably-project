@@ -43,7 +43,7 @@ function AerisCodeBlock({ code, language }: SyntaxHighlighterProps) {
       {language !== '' && language !== 'unknown' && (
         <p className="border-b border-border px-3 py-1.5 font-mono text-xs text-muted">{language}</p>
       )}
-      <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed text-default">
+      <pre className="overflow-x-auto p-3 font-mono text-sm leading-relaxed text-default">
         {highlighted === null ? (
           <code>{code}</code>
         ) : (
@@ -60,7 +60,7 @@ function InlineCode({ node: _node, className, ...props }: MarkdownProps<'code'>)
   return (
     <code
       className={cn(
-        !isCodeBlock && 'rounded border border-border bg-surface px-1 py-0.5 font-mono text-xs text-default',
+        !isCodeBlock && 'rounded border border-border bg-surface px-1 py-0.5 font-mono text-sm text-default',
         className,
       )}
       {...props}
@@ -81,13 +81,13 @@ const markdownComponents = {
     <ol className={cn('my-2 ml-5 list-decimal space-y-1 first:mt-0 last:mb-0', className)} {...props} />
   ),
   h1: ({ node: _node, className, ...props }: MarkdownProps<'h1'>) => (
-    <h3 className={cn('mt-4 mb-1.5 text-sm font-semibold first:mt-0', className)} {...props} />
+    <h3 className={cn('mt-5 mb-2 text-lg font-semibold tracking-tight first:mt-0', className)} {...props} />
   ),
   h2: ({ node: _node, className, ...props }: MarkdownProps<'h2'>) => (
-    <h3 className={cn('mt-4 mb-1.5 text-sm font-semibold first:mt-0', className)} {...props} />
+    <h3 className={cn('mt-5 mb-2 text-lg font-semibold tracking-tight first:mt-0', className)} {...props} />
   ),
   h3: ({ node: _node, className, ...props }: MarkdownProps<'h3'>) => (
-    <h4 className={cn('mt-3 mb-1 text-sm font-semibold first:mt-0', className)} {...props} />
+    <h4 className={cn('mt-4 mb-1.5 text-base font-semibold first:mt-0', className)} {...props} />
   ),
   a: ({ node: _node, className, ...props }: MarkdownProps<'a'>) => (
     <a
@@ -108,7 +108,7 @@ const markdownComponents = {
   ),
   table: ({ node: _node, className, ...props }: MarkdownProps<'table'>) => (
     <div className="my-3 overflow-x-auto first:mt-0 last:mb-0">
-      <table className={cn('w-full border-collapse bg-surface text-xs', className)} {...props} />
+      <table className={cn('w-full border-collapse bg-surface text-sm', className)} {...props} />
     </div>
   ),
   th: ({ node: _node, className, ...props }: MarkdownProps<'th'>) => (
