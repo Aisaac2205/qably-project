@@ -402,8 +402,8 @@ button:focus-visible,
    Motion earns its place: page content fades/rises once on mount to
    guide attention, never decorates. 200ms ease-out max per product
    motion budget. Fully disabled under reduced motion.
-   The one loop allowed is the spinner: a wait with no known end is a
-   state, and a still mark cannot express it. */
+   The loops allowed are the spinner and the skeleton shimmer: a wait
+   with no known end is a state, and a still mark cannot express it. */
 
 @keyframes page-enter {
   from {
@@ -419,6 +419,68 @@ button:focus-visible,
 @media (prefers-reduced-motion: no-preference) {
   .animate-page-enter {
     animation: page-enter 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  /* Resolved content replacing a skeleton. Declared before the stagger
+     so a direct child of a stagger container keeps its slot delay. */
+  .animate-enter {
+    animation: page-enter 200ms var(--ease-out-quart) both;
+  }
+
+  /* Top-level sections of a screen enter one after another: 40ms steps,
+     capped so the last section starts by 200ms. */
+  .animate-stagger > * {
+    animation: page-enter 200ms var(--ease-out-quart) both;
+  }
+  .animate-stagger > :nth-child(2) { animation-delay: 40ms; }
+  .animate-stagger > :nth-child(3) { animation-delay: 80ms; }
+  .animate-stagger > :nth-child(4) { animation-delay: 120ms; }
+  .animate-stagger > :nth-child(5) { animation-delay: 160ms; }
+  .animate-stagger > :nth-child(n + 6) { animation-delay: 200ms; }
+}
+
+/* ─── Skeleton ────────────────────────────────────────────────────
+   A light surface block, never the muted TEXT colour. It fades in after
+   120ms so fast loads never flash a skeleton, then a composite-only
+   sheen sweeps across it. Layered so utilities can override the fill. */
+
+@keyframes skeleton-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@layer components {
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--surface-hover);
+    animation: skeleton-in 160ms var(--ease-out-quart) 120ms both;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .skeleton::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in oklch, var(--bg-surface) 60%, transparent),
+        transparent
+      );
+      transform: translateX(-100%);
+      animation: skeleton-shimmer 1.6s linear 280ms infinite;
+    }
   }
 }
 

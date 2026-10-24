@@ -112,7 +112,7 @@ describe('the runs loading skeleton', () => {
       const skeletons = container.querySelectorAll('[data-slot="skeleton"]')
 
       expect(skeletons.length).toBeGreaterThan(0)
-      expect(pulsing).toHaveLength(skeletons.length)
+      expect(pulsing).toHaveLength(0)
       expect(container.querySelector('.animate-spin')).toBeNull()
     })
 
