@@ -403,7 +403,10 @@ button:focus-visible,
    guide attention, never decorates. 200ms ease-out max per product
    motion budget. Fully disabled under reduced motion.
    The loops allowed are the spinner and the skeleton shimmer: a wait
-   with no known end is a state, and a still mark cannot express it. */
+   with no known end is a state, and a still mark cannot express it.
+   Entrances fill `backwards`, never `both`: a retained transform makes
+   every animated section a stacking context, which traps inline menus
+   (z-50) under the next section and re-anchors fixed descendants. */
 
 @keyframes page-enter {
   from {
@@ -418,19 +421,19 @@ button:focus-visible,
 
 @media (prefers-reduced-motion: no-preference) {
   .animate-page-enter {
-    animation: page-enter 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+    animation: page-enter 200ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
   }
 
   /* Resolved content replacing a skeleton. Declared before the stagger
      so a direct child of a stagger container keeps its slot delay. */
   .animate-enter {
-    animation: page-enter 200ms var(--ease-out-quart) both;
+    animation: page-enter 200ms var(--ease-out-quart) backwards;
   }
 
   /* Top-level sections of a screen enter one after another: 40ms steps,
      capped so the last section starts by 200ms. */
   .animate-stagger > * {
-    animation: page-enter 200ms var(--ease-out-quart) both;
+    animation: page-enter 200ms var(--ease-out-quart) backwards;
   }
   .animate-stagger > :nth-child(2) { animation-delay: 40ms; }
   .animate-stagger > :nth-child(3) { animation-delay: 80ms; }
