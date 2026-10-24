@@ -91,7 +91,9 @@ export function ProjectChatPanel({
         <SheetContent
           side="left"
           showCloseButton={false}
-          className="w-60 gap-0 border-r-0 p-0 sm:max-w-60 md:hidden"
+          // Same data-[side=left] variant as the sheet's own width, or its 3/4
+          // width outranks these and leaves a blank strip beside the sidebar.
+          className="gap-0 border-r-0 p-0 data-[side=left]:w-60 data-[side=left]:sm:max-w-60 md:hidden"
         >
           <SheetTitle className="sr-only">{t('aiReview.chatConversations')}</SheetTitle>
           <ChatThreadSidebar
