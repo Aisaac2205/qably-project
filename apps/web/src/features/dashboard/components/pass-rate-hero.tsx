@@ -56,10 +56,13 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
     [locale],
   )
 
-  const points =
-    overview === undefined
-      ? []
-      : buildExecutedCasesPoints(overview.passRateSeries.current, overview.passRateSeries.previous, formatLabel)
+  const points = useMemo(
+    () =>
+      overview === undefined
+        ? []
+        : buildExecutedCasesPoints(overview.passRateSeries.current, overview.passRateSeries.previous, formatLabel),
+    [overview, formatLabel],
+  )
 
   const chartData = useMemo(
     () => points.map((point) => ({ ...point, date: parseSeriesDate(point.id) })),
