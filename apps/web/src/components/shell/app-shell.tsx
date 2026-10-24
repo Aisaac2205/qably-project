@@ -10,13 +10,15 @@ import { useScrollRestoration } from '@/hooks/use-scroll-restoration'
 
 interface AppShellProps {
   children: React.ReactNode
+  /** The state the user left the sidebar in, read from its cookie on the server. */
+  defaultSidebarOpen?: boolean
 }
 
 function focusMainContent() {
   document.getElementById('main-content')?.focus()
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, defaultSidebarOpen = true }: AppShellProps) {
   const { t } = useTranslation()
   const mainRef = useRef<HTMLElement>(null)
 
@@ -25,7 +27,7 @@ export function AppShell({ children }: AppShellProps) {
   useProposalBatchToasts()
 
   return (
-    <SidebarProvider defaultOpen={true} className="h-dvh w-full overflow-hidden bg-surface">
+    <SidebarProvider defaultOpen={defaultSidebarOpen} className="h-dvh w-full overflow-hidden bg-surface">
       <a
         href="#main-content"
         onClick={focusMainContent}

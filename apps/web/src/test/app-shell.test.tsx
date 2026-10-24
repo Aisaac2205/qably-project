@@ -89,6 +89,17 @@ vi.mock('@/lib/auth-client', () => ({
 }))
 
 describe('AppShell', () => {
+  it('opens the sidebar in the state the user left it', async () => {
+    await act(async () => {
+      render(
+        <AppShell defaultSidebarOpen={false}>
+          <p>Content</p>
+        </AppShell>,
+      )
+    })
+    expect(document.querySelector('[data-slot="sidebar"][data-state]')).toHaveAttribute('data-state', 'collapsed')
+  })
+
   it('bounds the shell to the viewport so page columns scroll inside main, not the document', async () => {
     await act(async () => {
       render(
