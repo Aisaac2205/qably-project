@@ -27,7 +27,7 @@ export function GithubAuthButton({
       {pending ? (
         <Spinner />
       ) : (
-        <Image src="/logos/github.svg" alt="" width={16} height={16} aria-hidden="true" />
+        <Image src="/logos/github.svg" alt="" width={16} height={16} loading="eager" aria-hidden="true" />
       )}
       <span>{pending ? 'Redirecting to GitHub…' : label}</span>
     </Button>
