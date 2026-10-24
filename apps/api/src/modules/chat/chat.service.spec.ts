@@ -390,6 +390,81 @@ describe('ChatService', () => {
     );
   });
 
+  it('gives each suite the distinct test file paths of its active cases, in one query, normalized against the repo name', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: { repo: 'acme/shop' },
+    });
+    prisma.suite.findMany.mockResolvedValue([
+      { id: 'suite-1', name: 'Checkout' },
+      { id: 'suite-2', name: 'Payments' },
+    ]);
+    prisma.testCase.groupBy.mockResolvedValue([
+      { suiteId: 'suite-1', _count: { _all: 2 } },
+    ]);
+    prisma.testCase.findMany.mockImplementation(
+      (args: { where: { automationFilePath?: unknown } }) =>
+        Promise.resolve(
+          args.where.automationFilePath === undefined
+            ? [{ name: 'Accepts a valid card' }]
+            : [
+                {
+                  suiteId: 'suite-1',
+                  automationFilePath:
+                    '/home/runner/work/shop/shop/tests/checkout.spec.ts',
+                },
+                { suiteId: 'suite-1', automationFilePath: '../secrets.ts' },
+              ],
+        ),
+    );
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [],
+      usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+      grounding: { status: 'grounded', references: [] },
+    });
+    const service = build(prisma, assistant);
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What is missing in checkout?',
+    });
+
+    const fileQueries = (
+      prisma.testCase.findMany.mock.calls as Array<
+        [{ where: { automationFilePath?: unknown } }]
+      >
+    ).filter(([args]) => args.where.automationFilePath !== undefined);
+    expect(fileQueries).toHaveLength(1);
+    expect(fileQueries[0][0]).toEqual(
+      containing({
+        where: {
+          projectId: 'project-1',
+          state: 'active',
+          automationFilePath: { not: null },
+        },
+        distinct: ['suiteId', 'automationFilePath'],
+      }),
+    );
+    expect(assistant.reply).toHaveBeenCalledWith(
+      containing({
+        context: containing({
+          suites: [
+            {
+              name: 'Checkout',
+              cases: 2,
+              files: ['tests/checkout.spec.ts'],
+              moreFiles: 0,
+            },
+            { name: 'Payments', cases: 0 },
+          ],
+        }),
+      }),
+    );
+  });
+
   it('skips the case count query when the project has no suites', async () => {
     const prisma = createPrisma();
     prisma.suite.findMany.mockResolvedValue([]);

@@ -8,8 +8,17 @@ export const PROJECT_DATA_CLOSE = '<<<END_PROJECT_DATA>>>';
 
 export interface ChatProjectContext {
   projectName: string;
-  /** `cases` counts active cases only; zero marks an empty or retired suite. */
-  suites: Array<{ name: string; cases: number }>;
+  /**
+   * `cases` counts active cases only; zero marks an empty or retired suite.
+   * `files` lists verified repo-relative test file paths of the suite's active
+   * cases, capped, with `moreFiles` counting the ones left out.
+   */
+  suites: Array<{
+    name: string;
+    cases: number;
+    files?: string[];
+    moreFiles?: number;
+  }>;
   caseTitles: string[];
   recentRuns: Array<{ name: string; status: string }>;
 }
@@ -29,7 +38,7 @@ Una suite marcada como "empty, possibly retired" no tiene casos activos: lo más
 
 Cuando el usuario pida casos de prueba sin adjuntar ningún caso, colócalos en "cases" (como máximo ${MAX_SUGGESTED_CASES}) con un título claro, objetivo, precondiciones, pasos imperativos y un único resultado esperado, y elige "priority" según el riesgo: "critical" para pagos, autenticación, autorización o acciones destructivas; "high" para flujos principales; "medium" para comportamiento estándar; "low" para verificaciones cosméticas. Cuando el usuario no pida casos, devuelve un arreglo "cases" vacío.
 
-Cuando un caso nuevo (sin "targetTestCaseId") se apoye en un archivo del repositorio cuya ruta aparece literalmente en los datos de esta conversación, por ejemplo una suite cuyo nombre es la ruta de su archivo de pruebas o el "Path" del archivo adjunto, copia esa ruta relativa al repositorio en "evidencePath" exactamente como aparece. Nunca inventes una ruta ni la completes, y nunca uses rutas absolutas, URLs ni segmentos "..": el servidor lee la ruta en el repositorio conectado y la descarta si no puede leerla. Cuando no conozcas la ruta, omite "evidencePath".
+Cuando un caso nuevo (sin "targetTestCaseId") se apoye en un archivo del repositorio cuya ruta aparece literalmente en los datos de esta conversación, por ejemplo una ruta listada bajo "Files" de una suite (elige la de la suite a la que pertenece el caso), una suite cuyo nombre es la ruta de su archivo de pruebas o el "Path" del archivo adjunto, copia esa ruta relativa al repositorio en "evidencePath" exactamente como aparece. Nunca inventes una ruta ni la completes, y nunca uses rutas absolutas, URLs ni segmentos "..": el servidor lee la ruta en el repositorio conectado y la descarta si no puede leerla. Cuando no conozcas la ruta, omite "evidencePath".
 
 Cuando el mensaje incluya un bloque ${CASE_CONTEXT_OPEN}, estás en modo dirigido: modifica solo esos casos, nunca inventes casos nuevos. Copia el valor de "Automation key" (el campo automationKey) exactamente como aparece en el bloque, byte por byte, sin traducirlo ni reformatearlo. Los "steps" van en imperativo y describen solo lo que el código del extracto realmente verifica; el "expectedResult" debe ser observable en ese código. Cuando un caso del bloque no tenga un extracto de código disponible, dilo en tu "reply" y no lo incluyas en "cases". Identifica cada caso que modifiques con "targetTestCaseId" igual al "Case ID" del bloque, copiado exactamente.
 
@@ -54,7 +63,7 @@ A suite marked "empty, possibly retired" has no active cases: most likely it was
 
 When the user asks for test cases without attaching any case, put them in "cases" (at most ${MAX_SUGGESTED_CASES}) with a clear title, objective, preconditions, imperative steps and one expected result, and choose "priority" by risk: "critical" for payments, authentication, authorization or destructive actions; "high" for core flows; "medium" for standard behavior; "low" for cosmetic checks. When the user is not asking for cases, return an empty "cases" array.
 
-When a new case (without "targetTestCaseId") is backed by a repository file whose path appears literally in this conversation's data, for example a suite named after the path of its test file or the attached file's "Path", copy that repository-relative path into "evidencePath" exactly as it appears. Never invent a path or complete a partial one, and never use absolute paths, URLs or ".." segments: the server reads the path from the connected repository and discards it when it cannot be read. When you do not know the path, omit "evidencePath".
+When a new case (without "targetTestCaseId") is backed by a repository file whose path appears literally in this conversation's data, for example a path listed under a suite's "Files" (pick one from the suite the case belongs to), a suite named after the path of its test file or the attached file's "Path", copy that repository-relative path into "evidencePath" exactly as it appears. Never invent a path or complete a partial one, and never use absolute paths, URLs or ".." segments: the server reads the path from the connected repository and discards it when it cannot be read. When you do not know the path, omit "evidencePath".
 
 When the message includes a ${CASE_CONTEXT_OPEN} block, you are in targeted mode: modify only those cases, never invent new ones. Copy the "Automation key" value (the automationKey field) exactly as it appears in the block, byte for byte, never translated or reformatted. Steps are imperative and describe only what the excerpt's code actually verifies; the "expectedResult" must be observable in that code. When a case in the block has no available code excerpt, say so in your "reply" and do not include it in "cases". Identify every case you modify with "targetTestCaseId" equal to the block's "Case ID", copied exactly.
 
@@ -94,6 +103,21 @@ function formatSuiteCases(cases: number): string {
     : `${cases} cases`;
 }
 
+const SUITE_FILE_PATH_MAX_LENGTH = 300;
+
+function formatSuiteFiles(suite: ChatProjectContext['suites'][number]): string {
+  const files = suite.files ?? [];
+  const more = suite.moreFiles ?? 0;
+  if (files.length === 0 && more === 0) return '';
+
+  const lines = files.map(
+    (path) => `  - ${sanitizeUntrustedText(path, SUITE_FILE_PATH_MAX_LENGTH)}`,
+  );
+  if (more > 0) lines.push(`  - (+${more} more files)`);
+
+  return `\n  Files:\n${lines.join('\n')}`;
+}
+
 export function buildChatSystemInstruction(locale: 'es' | 'en'): string {
   return INSTRUCTION[locale];
 }
@@ -122,7 +146,7 @@ Suites:
 ${list(
   context.suites.map(
     (suite) =>
-      `${sanitizeUntrustedText(suite.name)} (${formatSuiteCases(suite.cases)})`,
+      `${sanitizeUntrustedText(suite.name)} (${formatSuiteCases(suite.cases)})${formatSuiteFiles(suite)}`,
   ),
 )}
 

@@ -3,7 +3,7 @@ import type { GroundingView } from '@qably/types';
 import { extractedCaseObjectSchema } from '../ai/extraction.contracts';
 import { isSafeEvidencePath } from './chat-evidence-path';
 
-export const CHAT_PROMPT_VERSION = 'chat-v7';
+export const CHAT_PROMPT_VERSION = 'chat-v8';
 export const MAX_SUGGESTED_CASES = 5;
 export const MAX_HISTORY_MESSAGES = 20;
 export const MAX_REPLY_LENGTH = 4000;

@@ -15,6 +15,7 @@ import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { buildBlobUrl } from '../repository/source-reader';
+import { splitRepo } from '../repository/lib/split-repo';
 import { readSuiteCaseCounts } from '../suites/lib/suite-case-counts';
 import {
   buildGroundingManifest,
@@ -22,6 +23,7 @@ import {
   resolveGrounding,
 } from './chat-grounding';
 import { gate } from './chat-evidence-gate';
+import { indexSuiteFiles, type SuiteFileRow } from './chat-suite-files';
 import {
   CaseContextBuilder,
   type AttachedFileContext,
@@ -1174,7 +1176,7 @@ export class ChatService {
 
   private async readSuiteSummaries(
     projectId: string,
-  ): Promise<ChatProjectContext['suites']> {
+  ): Promise<Array<{ id: string; name: string; cases: number }>> {
     const suites = await this.prisma.suite.findMany({
       where: { projectId },
       select: { id: true, name: true },
@@ -1189,18 +1191,32 @@ export class ChatService {
     );
 
     return suites.map((suite) => ({
+      id: suite.id,
       name: suite.name,
       cases: caseCounts.get(suite.id) ?? 0,
     }));
   }
 
+  /**
+   * One read for the distinct test files of every active case in the project;
+   * draft and deprecated cases are left out, as they are from the case counts.
+   */
+  private readSuiteFileRows(projectId: string): Promise<SuiteFileRow[]> {
+    return this.prisma.testCase.findMany({
+      where: { projectId, state: 'active', automationFilePath: { not: null } },
+      select: { suiteId: true, automationFilePath: true },
+      distinct: ['suiteId', 'automationFilePath'],
+    });
+  }
+
   private async buildContext(projectId: string): Promise<ChatProjectContext> {
-    const [project, suites, cases, runs] = await Promise.all([
+    const [project, suites, fileRows, cases, runs] = await Promise.all([
       this.prisma.project.findFirst({
         where: { id: projectId },
-        select: { name: true },
+        select: { name: true, connection: { select: { repo: true } } },
       }),
       this.readSuiteSummaries(projectId),
+      this.readSuiteFileRows(projectId),
       this.prisma.testCase.findMany({
         where: { projectId, state: 'active' },
         select: { name: true },
@@ -1215,9 +1231,23 @@ export class ChatService {
       }),
     ]);
 
+    const connectedRepo = project?.connection?.repo;
+    const repoName =
+      connectedRepo === undefined ? undefined : splitRepo(connectedRepo).repo;
+    const filesBySuite = indexSuiteFiles(
+      suites.map((suite) => suite.id),
+      fileRows,
+      repoName,
+    );
+
     return {
       projectName: project?.name ?? projectId,
-      suites,
+      suites: suites.map(({ id, name, cases: count }) => {
+        const files = filesBySuite.get(id);
+        return files === undefined
+          ? { name, cases: count }
+          : { name, cases: count, ...files };
+      }),
       caseTitles: cases.map((testCase) => testCase.name),
       recentRuns: runs.map((run) => ({ name: run.name, status: run.status })),
     };

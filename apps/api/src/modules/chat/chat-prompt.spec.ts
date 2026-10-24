@@ -157,6 +157,15 @@ describe('buildChatSystemInstruction', () => {
     expect(buildChatSystemInstruction('en')).toMatch(/archive or clean up/i);
   });
 
+  it('names a path listed under the files of a suite as a literal source for the evidence path', () => {
+    expect(buildChatSystemInstruction('es')).toMatch(
+      /listada bajo "Files" de una suite[\s\S]*"evidencePath"/,
+    );
+    expect(buildChatSystemInstruction('en')).toMatch(
+      /listed under a suite's "Files"[\s\S]*"evidencePath"/,
+    );
+  });
+
   it('tells the assistant to copy, never invent, the repository path backing a new case', () => {
     expect(buildChatSystemInstruction('es')).toMatch(
       /"evidencePath"[\s\S]*nunca inventes una ruta/i,
@@ -240,6 +249,45 @@ describe('buildProjectContextTurn', () => {
     );
 
     expect(turn.match(new RegExp(PROJECT_DATA_CLOSE, 'g'))).toHaveLength(1);
+  });
+
+  it('lists the test file paths of each suite under it, one per line, with the overflow count', () => {
+    const turn = buildProjectContextTurn(
+      context({
+        suites: [
+          {
+            name: 'Checkout',
+            cases: 9,
+            files: ['tests/cart.spec.ts', 'tests/checkout.spec.ts'],
+            moreFiles: 2,
+          },
+          { name: 'Login', cases: 3, files: ['tests/login.spec.ts'] },
+          { name: 'Retired', cases: 0 },
+        ],
+      }),
+    );
+
+    expect(turn).toContain(
+      [
+        '- Checkout (9 cases)',
+        '  Files:',
+        '  - tests/cart.spec.ts',
+        '  - tests/checkout.spec.ts',
+        '  - (+2 more files)',
+        '- Login (3 cases)',
+        '  Files:',
+        '  - tests/login.spec.ts',
+        '- Retired (0 active cases — empty, possibly retired)',
+      ].join('\n'),
+    );
+  });
+
+  it('keeps a suite without known files on a single line', () => {
+    const turn = buildProjectContextTurn(
+      context({ suites: [{ name: 'Login', cases: 12, files: [] }] }),
+    );
+
+    expect(turn).toContain('- Login (12 cases)\n\nCase titles:');
   });
 
   it('flags a suite with no active cases as empty and possibly retired', () => {
