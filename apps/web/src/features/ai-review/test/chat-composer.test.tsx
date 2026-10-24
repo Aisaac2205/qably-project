@@ -94,6 +94,12 @@ describe('AerisComposer', () => {
     expect(chip).toHaveAttribute('title', ASSISTANT_MODEL_NAME)
   })
 
+  it('reminds once, under the input, that Aeris can make mistakes', async () => {
+    await renderComposer()
+
+    expect(screen.getByText(/aeris can make mistakes/i)).toBeInTheDocument()
+  })
+
   it('sends the typed message from the send button and clears the input', async () => {
     const user = await renderComposer()
 

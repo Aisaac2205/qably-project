@@ -246,6 +246,10 @@ export function AerisComposer({
         </div>
       </ComposerPrimitive.Root>
 
+      <p className="mx-auto mt-2 max-w-3xl px-2 text-center text-xs text-muted">
+        {t('aiReview.chatDisclaimer')}
+      </p>
+
       <ChatCasePicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}

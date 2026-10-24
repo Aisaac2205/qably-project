@@ -845,6 +845,7 @@
     "chatRemoveFile": "Remove {{path}}",
     "chatFileUnreadable": "Couldn't read that file. Check the path and try again.",
     "chatNoCodeEvidence": "This proposal has no code evidence yet. Attach a case or reference a file in the chat to send it to review.",
+    "chatDisclaimer": "Aeris can make mistakes. Check important information.",
     "chatGroundingInsufficient": "Answered without citing specific data from this project.",
     "chatCopyReply": "Copy reply",
     "chatAssistantAuthor": "Aeris said",
