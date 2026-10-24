@@ -66,8 +66,8 @@ export function ChatGeneratedCaseCard({
   const isBlocked = state === 'error' && errorKind === 'no-code-evidence'
 
   return (
-    // An attachment of the reply above it: a plain bordered surface, so the
-    // AI tint marks only its header.
+    // An attachment of the reply above it: one bordered surface with no card
+    // inside it, the AI tint on its header and black only on its action.
     <div className="space-y-2 rounded-xl border border-border bg-surface p-3">
       <div className="flex items-center gap-1.5 text-xs font-semibold text-ai">
         <AerisIcon size={14} />
@@ -83,7 +83,7 @@ export function ChatGeneratedCaseCard({
       )}
 
       {suggestedCase.targetTestCaseId !== undefined && (
-        <div className="space-y-1.5 rounded-lg bg-canvas p-2.5">
+        <div className="space-y-1.5 border-t border-border pt-2.5">
           <p className="text-xs font-semibold text-muted">
             {t('aiReview.chatWhatAerisProposes')}
           </p>
@@ -128,7 +128,6 @@ export function ChatGeneratedCaseCard({
       ) : (
         <Button
           size="sm"
-          variant="outline"
           onClick={handleSend}
           disabled={state === 'pending' || isBlocked}
         >

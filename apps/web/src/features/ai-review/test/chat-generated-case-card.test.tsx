@@ -43,7 +43,8 @@ describe('ChatGeneratedCaseCard', () => {
       )
     })
     expect(screen.getByText('Login with 2FA shows a verification prompt')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Send to review' })).toBeInTheDocument()
+    // The card's one primary action carries the product's black, not an outline.
+    expect(screen.getByRole('button', { name: 'Send to review' })).toHaveClass('bg-primary')
   })
 
   it('sends the case to review and shows a link to the review queue', async () => {
