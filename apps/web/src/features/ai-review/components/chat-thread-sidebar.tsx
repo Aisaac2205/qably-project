@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Plus, ChatCircleText, SidebarSimple, Trash } from '@phosphor-icons/react'
+import { AerisIcon } from '@/components/icons/aeris-icon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -45,9 +46,20 @@ export function ChatThreadSidebar({
             onClick={onToggleCollapse}
             aria-label={t('aiReview.expandSidebar')}
             title={t('aiReview.expandSidebar')}
-            className="group/button size-9 rounded-lg inline-flex items-center justify-center text-sidebar-fg-muted hover:text-sidebar-foreground hover:bg-surface-hover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer shrink-0"
+            className="group/button relative size-9 rounded-lg inline-flex items-center justify-center text-sidebar-fg-muted hover:text-sidebar-foreground hover:bg-surface-hover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer shrink-0"
           >
-            <SidebarSimple size={18} weight="regular" />
+            {/* The rail shows the Aeris mark and turns it into the expand
+                control under the pointer or keyboard focus. */}
+            <AerisIcon
+              size={20}
+              className="transition duration-150 ease-out-quart group-hover/button:scale-90 group-hover/button:opacity-0 group-focus-visible/button:scale-90 group-focus-visible/button:opacity-0"
+            />
+            <SidebarSimple
+              size={18}
+              weight="regular"
+              aria-hidden="true"
+              className="absolute scale-90 opacity-0 transition duration-150 ease-out-quart group-hover/button:scale-100 group-hover/button:opacity-100 group-focus-visible/button:scale-100 group-focus-visible/button:opacity-100"
+            />
             <span className="sr-only">{t('aiReview.expandSidebar')}</span>
           </button>
         )}
