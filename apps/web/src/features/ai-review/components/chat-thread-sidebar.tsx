@@ -67,19 +67,11 @@ export function ChatThreadSidebar({
               aria-expanded={false}
               onClick={onToggleCollapse}
               title={t('aiReview.expandSidebar')}
-              className={cn(iconButtonClass, 'group/button relative')}
+              className={iconButtonClass}
             >
-              {/* The rail shows the Aeris mark and turns it into the expand
-                  control under the pointer or keyboard focus. */}
-              <AerisIcon
-                size={20}
-                className="transition duration-150 ease-out-quart group-hover/button:scale-90 group-hover/button:opacity-0 group-focus-visible/button:scale-90 group-focus-visible/button:opacity-0"
-              />
-              <SidebarSimple
-                size={18}
-                aria-hidden="true"
-                className="absolute scale-90 opacity-0 transition duration-150 ease-out-quart group-hover/button:scale-100 group-hover/button:opacity-100 group-focus-visible/button:scale-100 group-focus-visible/button:opacity-100"
-              />
+              {/* A plain control, not the Aeris mark: the app's own logo sits
+                  right above the rail, and two marks stacked read as two products. */}
+              <SidebarSimple size={18} aria-hidden="true" />
               <span className="sr-only">{t('aiReview.expandSidebar')}</span>
             </button>
           )
