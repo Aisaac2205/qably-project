@@ -171,7 +171,7 @@ describe('ChatThreadSidebar', () => {
     ).toHaveLength(0)
   })
 
-  it('renders compact icons and triggers onToggleCollapse when collapsed', async () => {
+  it('keeps only the mark on the rail, and expands from it', async () => {
     const onToggleCollapse = vi.fn()
     const onSelectThread = vi.fn()
     const user = userEvent.setup()
@@ -194,8 +194,31 @@ describe('ChatThreadSidebar', () => {
     await user.click(expandButton)
     expect(onToggleCollapse).toHaveBeenCalledTimes(1)
 
-    const threadButtons = screen.getAllByRole('button', { name: /First thread message/i })
-    await user.click(threadButtons[0])
-    expect(onSelectThread).toHaveBeenCalledWith('t1')
+    expect(screen.queryByRole('button', { name: /new chat|nuevo chat/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('First thread message')).not.toBeInTheDocument()
+    expect(screen.queryByText(/conversations|conversaciones/i)).not.toBeInTheDocument()
+  })
+
+  it('names the assistant and closes from the drawer', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+
+    await act(async () => {
+      render(
+        <ChatThreadSidebar
+          threads={threads}
+          activeThreadId="t1"
+          onSelectThread={vi.fn()}
+          onNewChat={vi.fn()}
+          variant="drawer"
+          onClose={onClose}
+        />,
+      )
+    })
+
+    expect(screen.getByText('Aeris')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /collapse sidebar|ocultar barra lateral/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^(close|cerrar)$/i }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

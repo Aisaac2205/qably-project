@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ChatCircleText, SidebarSimple, Trash } from '@phosphor-icons/react'
+import { Plus, SidebarSimple, Trash, X } from '@phosphor-icons/react'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { ChatThreadRecord } from '@qably/types'
+import { ASSISTANT_NAME } from '../lib/assistant-name'
 
 interface ChatThreadSidebarProps {
   threads: ChatThreadRecord[]
@@ -14,212 +15,179 @@ interface ChatThreadSidebarProps {
   onSelectThread: (threadId: string) => void
   onNewChat: () => void
   onDeleteThread?: (threadId: string) => void
+  /** `panel` sits beside the chat and can collapse to a rail; `drawer` fills a mobile sheet. */
+  variant?: 'panel' | 'drawer'
   isCollapsed?: boolean
   onToggleCollapse?: () => void
+  onClose?: () => void
 }
 
+const iconButtonClass =
+  'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-canvas-hover hover:text-default focus-visible:outline-2 focus-visible:outline-primary'
+
+// One aside for both states, so its width can animate between the rail and
+// the panel. The rail keeps only the mark, in the same place it sits in the
+// panel; New chat and the conversations only exist while it is open.
 export function ChatThreadSidebar({
   threads,
   activeThreadId,
   onSelectThread,
   onNewChat,
   onDeleteThread,
+  variant = 'panel',
   isCollapsed = false,
   onToggleCollapse,
+  onClose,
 }: ChatThreadSidebarProps) {
   const { t } = useTranslation()
   const [threadPendingDeletion, setThreadPendingDeletion] = useState<string | null>(null)
-
-  if (isCollapsed) {
-    return (
-      <aside
-        aria-label={t('aiReview.projectChat')}
-        className="w-13 shrink-0 flex flex-col items-center h-full bg-surface border-r border-border min-h-0 py-2.5 px-1.5 transition-all duration-200"
-      >
-        {onToggleCollapse && (
-          <button
-            type="button"
-            tabIndex={0}
-            data-slot="sidebar-trigger"
-            data-sidebar="trigger"
-            aria-expanded={false}
-            onClick={onToggleCollapse}
-            aria-label={t('aiReview.expandSidebar')}
-            title={t('aiReview.expandSidebar')}
-            className="group/button relative size-9 rounded-lg inline-flex items-center justify-center text-sidebar-fg-muted hover:text-sidebar-foreground hover:bg-surface-hover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer shrink-0"
-          >
-            {/* The rail shows the Aeris mark and turns it into the expand
-                control under the pointer or keyboard focus. */}
-            <AerisIcon
-              size={20}
-              className="transition duration-150 ease-out-quart group-hover/button:scale-90 group-hover/button:opacity-0 group-focus-visible/button:scale-90 group-focus-visible/button:opacity-0"
-            />
-            <SidebarSimple
-              size={18}
-              weight="regular"
-              aria-hidden="true"
-              className="absolute scale-90 opacity-0 transition duration-150 ease-out-quart group-hover/button:scale-100 group-hover/button:opacity-100 group-focus-visible/button:scale-100 group-focus-visible/button:opacity-100"
-            />
-            <span className="sr-only">{t('aiReview.expandSidebar')}</span>
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={onNewChat}
-          aria-label={t('aiReview.newChat')}
-          title={t('aiReview.newChat')}
-          className="mt-2 size-9 rounded-lg inline-flex items-center justify-center bg-primary text-primary-fg hover:bg-primary-hover transition-all duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary cursor-pointer shrink-0"
-        >
-          <Plus size={16} weight="bold" aria-hidden="true" />
-        </button>
-
-        <div className="mt-3 flex-1 overflow-y-auto min-h-0 w-full flex flex-col items-center gap-1">
-          {threads.map((thread) => {
-            const isActive = activeThreadId === thread.id
-
-            return (
-              <button
-                key={thread.id}
-                type="button"
-                onClick={() => onSelectThread(thread.id)}
-                title={thread.title}
-                aria-label={thread.title}
-                className={cn(
-                  'size-9 rounded-lg inline-flex items-center justify-center transition-all cursor-pointer shrink-0',
-                  isActive
-                    ? 'bg-primary/10 text-primary border border-primary/20'
-                    : 'text-muted hover:text-default hover:bg-surface-hover',
-                )}
-              >
-                <ChatCircleText
-                  size={16}
-                  weight={isActive ? 'fill' : 'regular'}
-                  aria-hidden="true"
-                />
-              </button>
-            )
-          })}
-        </div>
-      </aside>
-    )
-  }
+  const isDrawer = variant === 'drawer'
+  const isRail = !isDrawer && isCollapsed
 
   return (
     <aside
       aria-label={t('aiReview.projectChat')}
-      className="w-60 shrink-0 flex flex-col h-full bg-surface border-r border-border min-h-0 transition-all duration-200"
+      className={cn(
+        'flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-surface',
+        isDrawer
+          ? 'w-full'
+          : 'transition-[width] duration-200 ease-out-quart motion-reduce:transition-none',
+        // The rail drops its border instead of making it transparent: the
+        // unlayered base border-color in globals.css outranks border-transparent.
+        !isDrawer && (isRail ? 'w-14 border-r-0' : 'w-64 border-r border-border'),
+      )}
     >
-      <div className="p-2.5 border-b border-border shrink-0 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onNewChat}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-[0.98]',
-            ' focus-visible:outline-2 focus-visible:outline-primary cursor-pointer',
-            activeThreadId === null
-              ? 'bg-primary text-primary-fg hover:bg-primary-hover'
-              : 'bg-surface hover:bg-surface-hover text-default border border-border',
-          )}
-        >
-          <Plus size={15} weight="bold" aria-hidden="true" />
-          <span>{t('aiReview.newChat')}</span>
-        </button>
-
-        {onToggleCollapse && (
-          <button
-            type="button"
-            tabIndex={0}
-            data-slot="sidebar-trigger"
-            data-sidebar="trigger"
-            aria-expanded={true}
-            onClick={onToggleCollapse}
-            aria-label={t('aiReview.collapseSidebar')}
-            title={t('aiReview.collapseSidebar')}
-            className="group/button size-8.5 rounded-lg shrink-0 inline-flex items-center justify-center text-sidebar-fg-muted hover:text-sidebar-foreground hover:bg-surface-hover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer border border-transparent hover:border-border"
-          >
-            <SidebarSimple size={18} weight="regular" />
-            <span className="sr-only">{t('aiReview.collapseSidebar')}</span>
-          </button>
-        )}
-      </div>
-
-      <div className="px-3 pt-3 pb-1.5 flex items-center justify-between shrink-0">
-        <span className="text-xs font-medium text-muted">
-          {t('aiReview.chatConversations')}
-        </span>
-        {threads.length > 0 && (
-          <span className="text-xs font-medium tabular-nums text-muted font-mono bg-canvas px-1.5 py-0.5 rounded border border-border/60">
-            {threads.length}
-          </span>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto min-h-0 px-2 py-1 space-y-1" role="list">
-        {threads.length === 0 ? (
-          <p className="text-xs text-muted px-2 py-6 text-center">{t('aiReview.noChats')}</p>
+      <div className="flex h-14 shrink-0 items-center gap-1 px-2.5">
+        {isRail ? (
+          onToggleCollapse && (
+            <button
+              type="button"
+              data-slot="sidebar-trigger"
+              data-sidebar="trigger"
+              aria-expanded={false}
+              onClick={onToggleCollapse}
+              title={t('aiReview.expandSidebar')}
+              className={cn(iconButtonClass, 'group/button relative')}
+            >
+              {/* The rail shows the Aeris mark and turns it into the expand
+                  control under the pointer or keyboard focus. */}
+              <AerisIcon
+                size={20}
+                className="transition duration-150 ease-out-quart group-hover/button:scale-90 group-hover/button:opacity-0 group-focus-visible/button:scale-90 group-focus-visible/button:opacity-0"
+              />
+              <SidebarSimple
+                size={18}
+                aria-hidden="true"
+                className="absolute scale-90 opacity-0 transition duration-150 ease-out-quart group-hover/button:scale-100 group-hover/button:opacity-100 group-focus-visible/button:scale-100 group-focus-visible/button:opacity-100"
+              />
+              <span className="sr-only">{t('aiReview.expandSidebar')}</span>
+            </button>
+          )
         ) : (
-          threads.map((thread) => {
-            const isActive = activeThreadId === thread.id
-
-            return (
-              <div
-                key={thread.id}
-                role="listitem"
-                className={cn(
-                  'group relative flex items-center rounded-lg transition-all duration-150',
-                  isActive
-                    ? 'bg-surface border border-border'
-                    : 'border border-transparent hover:bg-surface/70',
-                )}
+          <>
+            <p className="flex min-w-0 flex-1 animate-page-enter items-center gap-2.5 px-2">
+              <AerisIcon size={20} />
+              <span className="truncate text-base font-semibold tracking-tight text-default">
+                {ASSISTANT_NAME}
+              </span>
+            </p>
+            {isDrawer && onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t('common.close')}
+                title={t('common.close')}
+                className={iconButtonClass}
               >
-                <button
-                  type="button"
-                  onClick={() => onSelectThread(thread.id)}
-                  aria-current={isActive ? 'true' : undefined}
-                  title={thread.title}
-                  className={cn(
-                    'flex items-center gap-2 min-w-0 flex-1 rounded-lg px-2.5 py-2 text-xs cursor-pointer text-left',
-                    'focus-visible:outline-2 focus-visible:outline-primary',
-                    onDeleteThread ? 'pr-8' : '',
-                    isActive
-                      ? 'text-default font-semibold'
-                      : 'text-muted group-hover:text-default',
-                  )}
-                >
-                  <ChatCircleText
-                    size={15}
-                    weight={isActive ? 'fill' : 'regular'}
-                    className={cn(
-                      'shrink-0 transition-colors',
-                      isActive ? 'text-primary' : 'text-muted group-hover:text-default',
-                    )}
-                    aria-hidden="true"
-                  />
-                  <span className="flex-1 min-w-0 truncate">{thread.title}</span>
-                </button>
-
-                {onDeleteThread && (
-                  <button
-                    type="button"
-                    onClick={() => setThreadPendingDeletion(thread.id)}
-                    aria-label={t('aiReview.deleteChatAria')}
-                    title={t('aiReview.deleteChatAria')}
-                    className={cn(
-                      'absolute right-1 size-6 shrink-0 rounded-md inline-flex items-center justify-center',
-                      'text-muted hover:text-fail hover:bg-fail-bg cursor-pointer',
-                      'transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-primary',
-                      'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100',
-                    )}
-                  >
-                    <Trash size={13} weight="regular" aria-hidden="true" />
-                  </button>
-                )}
-              </div>
-            )
-          })
+                <X size={18} aria-hidden="true" />
+              </button>
+            )}
+            {!isDrawer && onToggleCollapse && (
+              <button
+                type="button"
+                data-slot="sidebar-trigger"
+                data-sidebar="trigger"
+                aria-expanded={true}
+                onClick={onToggleCollapse}
+                aria-label={t('aiReview.collapseSidebar')}
+                title={t('aiReview.collapseSidebar')}
+                className={iconButtonClass}
+              >
+                <SidebarSimple size={18} aria-hidden="true" />
+              </button>
+            )}
+          </>
         )}
       </div>
+
+      {!isRail && (
+        <div className="flex min-h-0 flex-1 animate-page-enter flex-col">
+          <div className="shrink-0 px-2.5">
+            <button
+              type="button"
+              onClick={onNewChat}
+              className={cn(
+                'flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-default transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary md:h-9',
+                activeThreadId === null ? 'bg-canvas hover:bg-canvas-hover' : 'hover:bg-canvas-hover',
+              )}
+            >
+              <Plus size={16} weight="bold" aria-hidden="true" className="shrink-0" />
+              <span className="truncate whitespace-nowrap">{t('aiReview.newChat')}</span>
+            </button>
+          </div>
+
+          <p className="shrink-0 px-5 pt-5 pb-1.5 text-xs font-medium text-muted">
+            {t('aiReview.chatConversations')}
+          </p>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3" role="list">
+            {threads.length === 0 ? (
+              <p className="px-2.5 py-2 text-sm text-muted">{t('aiReview.noChats')}</p>
+            ) : (
+              threads.map((thread) => {
+                const isActive = activeThreadId === thread.id
+
+                return (
+                  <div key={thread.id} role="listitem" className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => onSelectThread(thread.id)}
+                      aria-current={isActive ? 'true' : undefined}
+                      title={thread.title}
+                      className={cn(
+                        'flex h-10 w-full cursor-pointer items-center rounded-lg px-2.5 text-left text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary md:h-9',
+                        onDeleteThread && 'pr-10',
+                        isActive
+                          ? 'bg-canvas font-medium text-default'
+                          : 'text-muted hover:bg-canvas-hover hover:text-default',
+                      )}
+                    >
+                      <span className="min-w-0 truncate">{thread.title}</span>
+                    </button>
+
+                    {onDeleteThread && (
+                      <button
+                        type="button"
+                        onClick={() => setThreadPendingDeletion(thread.id)}
+                        aria-label={t('aiReview.deleteChatAria')}
+                        title={t('aiReview.deleteChatAria')}
+                        className={cn(
+                          'absolute top-1/2 right-1 inline-flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md md:size-7',
+                          'text-muted transition-[opacity,color,background-color] duration-150 hover:bg-fail-bg hover:text-fail',
+                          'focus-visible:outline-2 focus-visible:outline-primary',
+                          'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100',
+                        )}
+                      >
+                        <Trash size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       {onDeleteThread && (
         <ConfirmDialog

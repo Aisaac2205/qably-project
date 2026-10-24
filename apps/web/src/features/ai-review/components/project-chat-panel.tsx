@@ -8,6 +8,7 @@ import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { flattenAttachableCases } from '@/features/ai-review/lib/attachable-cases'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useTranslation } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import { AerisChat } from './aeris-chat'
 import { ChatThreadSidebar } from './chat-thread-sidebar'
 
@@ -66,11 +67,6 @@ export function ProjectChatPanel({
     })
   }
 
-  const activeTitle = useMemo(
-    () => threads.find((thread) => thread.id === activeThreadId)?.title ?? null,
-    [threads, activeThreadId],
-  )
-
   return (
     <div className="flex h-full min-h-0">
       <h1 className="sr-only">{t('aiReview.projectChat')}</h1>
@@ -93,7 +89,7 @@ export function ProjectChatPanel({
           showCloseButton={false}
           // Same data-[side=left] variant as the sheet's own width, or its 3/4
           // width outranks these and leaves a blank strip beside the sidebar.
-          className="gap-0 border-r-0 p-0 data-[side=left]:w-60 data-[side=left]:sm:max-w-60 md:hidden"
+          className="gap-0 border-r-0 p-0 data-[side=left]:w-4/5 data-[side=left]:max-w-80 data-[side=left]:sm:max-w-80 md:hidden"
         >
           <SheetTitle className="sr-only">{t('aiReview.chatConversations')}</SheetTitle>
           <ChatThreadSidebar
@@ -108,12 +104,14 @@ export function ProjectChatPanel({
               setIsDrawerOpen(false)
             }}
             onDeleteThread={removeThread}
+            variant="drawer"
+            onClose={() => setIsDrawerOpen(false)}
           />
         </SheetContent>
       </Sheet>
 
       <div className="flex flex-col flex-1 min-w-0 h-full min-h-0">
-        <div className="flex items-center gap-2 shrink-0 bg-surface px-2 py-2 sm:px-4">
+        <div className={cn('flex items-center gap-2 shrink-0 bg-surface px-2 py-2 sm:px-4', !onExit && 'md:hidden')}>
           {onExit && (
             <button
               type="button"
@@ -129,13 +127,7 @@ export function ProjectChatPanel({
             </button>
           )}
 
-          {activeTitle === null ? (
-            <div className="flex-1" />
-          ) : (
-            <h2 className="flex-1 min-w-0 truncate text-center text-xs sm:text-left sm:text-sm font-semibold text-default">
-              {activeTitle}
-            </h2>
-          )}
+          <div className="flex-1" />
 
           <button
             type="button"

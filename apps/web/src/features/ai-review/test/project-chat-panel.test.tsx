@@ -4,6 +4,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { ApiError } from '@/lib/api-client'
 import { ChatStreamError } from '@/features/ai-review/lib/chat-stream'
 import {
+  ASSISTANT_MODEL_NAME,
   type ChatThreadDetailRecord,
   type Suite,
 } from '@qably/types'
@@ -134,12 +135,12 @@ describe('ProjectChatPanel', () => {
 
     await renderPanel()
 
-    const chip = screen.getByText('Aeris')
-    expect(chip).toBeInTheDocument()
-    expect(chip.parentElement).toHaveTextContent(/model|modelo/i)
+    const chip = screen.getByTitle(ASSISTANT_MODEL_NAME)
+    expect(chip).toHaveTextContent('Aeris')
+    expect(chip).toHaveTextContent(/model|modelo/i)
   })
 
-  it('titles the panel with the conversation being read', async () => {
+  it('marks the open conversation in the sidebar instead of titling the header', async () => {
     listThreads.mockResolvedValue([chatThread])
     getThread.mockResolvedValue(threadDetailAfterReply)
     const user = userEvent.setup()
@@ -148,10 +149,12 @@ describe('ProjectChatPanel', () => {
     await openThread(user)
 
     await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'How many cases are pending?' }),
-      ).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: 'How many cases are pending?' })).toHaveAttribute(
+        'aria-current',
+        'true',
+      ),
     )
+    expect(screen.queryByRole('heading', { name: 'How many cases are pending?' })).not.toBeInTheDocument()
   })
 
   it('reaches the conversations from a drawer on a narrow viewport', async () => {
@@ -183,11 +186,7 @@ describe('ProjectChatPanel', () => {
 
     await renderPanel()
     await openThread(user)
-    await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'How many cases are pending?' }),
-      ).toBeInTheDocument(),
-    )
+    expect(await screen.findByText('There are 4 cases pending review.')).toBeInTheDocument()
 
     // The sidebar owns "New chat"; the header no longer repeats it.
     const newChatButtons = screen.getAllByRole('button', { name: /^(new chat|nuevo chat)$/i })
@@ -195,9 +194,7 @@ describe('ProjectChatPanel', () => {
 
     await user.click(newChatButtons[0])
 
-    expect(
-      screen.queryByRole('heading', { name: 'How many cases are pending?' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText('There are 4 cases pending review.')).not.toBeInTheDocument()
   })
 
   it('offers no back control unless an exit is wired', async () => {
@@ -517,8 +514,8 @@ describe('ProjectChatPanel', () => {
       for (let node: HTMLElement | null = replyText; node !== null && node !== reply; node = node.parentElement) {
         expect(node.className).not.toMatch(/\b(border|bg-surface|rounded-2xl)\b/)
       }
-      // The composer chip is now the only place the model is named.
-      expect(screen.getAllByText('Aeris')).toHaveLength(1)
+      // The composer chip is the only place the model is named.
+      expect(screen.getAllByTitle(ASSISTANT_MODEL_NAME)).toHaveLength(1)
     })
 
     it('shows a question as a compact right-aligned bubble, attributed to the user for a screen reader', async () => {

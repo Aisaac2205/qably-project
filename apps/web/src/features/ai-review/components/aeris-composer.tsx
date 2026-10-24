@@ -10,12 +10,9 @@ import { MAX_ATTACHED_CASES, flattenAttachableCases } from '@/features/ai-review
 import { ChatCaseChip } from './chat-case-chip'
 import { ChatCasePicker } from './chat-case-picker'
 import { ChatFileChip } from './chat-file-chip'
+import { ASSISTANT_NAME } from '../lib/assistant-name'
 
 const MAX_MESSAGE_LENGTH = 4000
-
-// The composer names the assistant by its brand alone; the versioned model name
-// stays one hover away.
-const ASSISTANT_NAME = 'Aeris'
 
 const toolButtonClass =
   'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition duration-150 ease-out-quart hover:bg-surface-hover hover:text-default active:scale-95 focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 md:size-7'

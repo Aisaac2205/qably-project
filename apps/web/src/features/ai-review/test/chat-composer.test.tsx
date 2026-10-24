@@ -81,14 +81,15 @@ describe('AerisComposer', () => {
   it('names the model under the input, not above it', async () => {
     await renderComposer()
 
-    const model = screen.getByText('Aeris')
+    const model = screen.getByTitle(ASSISTANT_MODEL_NAME)
     expect(messageBox().compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('labels the model chip for a screen reader', async () => {
     await renderComposer()
 
-    const chip = screen.getByText('Aeris').parentElement
+    const chip = screen.getByTitle(ASSISTANT_MODEL_NAME)
+    expect(chip).toHaveTextContent('Aeris')
     expect(chip).toHaveTextContent(/model|modelo/i)
     expect(chip).toHaveAttribute('title', ASSISTANT_MODEL_NAME)
   })
