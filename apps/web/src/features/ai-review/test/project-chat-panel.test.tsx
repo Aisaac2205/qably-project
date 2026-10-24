@@ -176,7 +176,7 @@ describe('ProjectChatPanel', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('starts a new conversation from the header on desktop', async () => {
+  it('starts a new conversation from the sidebar, the only new chat control', async () => {
     listThreads.mockResolvedValue([chatThread])
     getThread.mockResolvedValue(threadDetailAfterReply)
     const user = userEvent.setup()
@@ -189,12 +189,11 @@ describe('ProjectChatPanel', () => {
       ).toBeInTheDocument(),
     )
 
-    const iconOnlyNewChat = screen
-      .getAllByRole('button', { name: /^(new chat|nuevo chat)$/i })
-      .find((button) => button.textContent === '')
-    expect(iconOnlyNewChat).toBeDefined()
+    // The sidebar owns "New chat"; the header no longer repeats it.
+    const newChatButtons = screen.getAllByRole('button', { name: /^(new chat|nuevo chat)$/i })
+    expect(newChatButtons).toHaveLength(1)
 
-    await user.click(iconOnlyNewChat as HTMLElement)
+    await user.click(newChatButtons[0])
 
     expect(
       screen.queryByRole('heading', { name: 'How many cases are pending?' }),

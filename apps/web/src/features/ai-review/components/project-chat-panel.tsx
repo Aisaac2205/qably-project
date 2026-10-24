@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CaretLeft, ChatsCircle, NotePencil } from '@phosphor-icons/react'
+import { CaretLeft, ChatsCircle } from '@phosphor-icons/react'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
 import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { flattenAttachableCases } from '@/features/ai-review/lib/attachable-cases'
@@ -143,16 +143,6 @@ export function ProjectChatPanel({
             className="md:hidden size-8 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
           >
             <ChatsCircle size={18} weight="regular" aria-hidden="true" />
-          </button>
-
-          <button
-            type="button"
-            onClick={startNewChat}
-            aria-label={t('aiReview.newChat')}
-            title={t('aiReview.newChat')}
-            className="hidden md:inline-flex size-8 shrink-0 rounded-lg items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <NotePencil size={18} weight="regular" aria-hidden="true" />
           </button>
         </div>
 
