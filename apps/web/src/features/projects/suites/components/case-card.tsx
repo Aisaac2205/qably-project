@@ -214,7 +214,7 @@ export function CaseCard({ testCase, projectId, githubRepo, onEdit, onDelete, on
       </div>
 
       <CaseDisclosurePanel isOpen={preconditionsOpen}>
-        <ul className="mt-2 text-sm text-default font-normal leading-relaxed space-y-1.5 list-disc list-inside p-3.5 rounded-lg bg-canvas border border-border/70">
+        <ul className="mt-2 text-sm text-default font-normal leading-relaxed space-y-1.5 list-disc list-inside p-3.5 rounded-lg bg-canvas border border-border/70 wrap-anywhere">
           {testCase.preconditions.map((precondition, i) => (
             <li key={i} className="text-default font-medium">{precondition}</li>
           ))}
@@ -222,7 +222,7 @@ export function CaseCard({ testCase, projectId, githubRepo, onEdit, onDelete, on
       </CaseDisclosurePanel>
 
       <CaseDisclosurePanel isOpen={stepsOpen}>
-        <ol className="mt-2 text-sm text-default font-normal leading-relaxed space-y-1.5 list-decimal list-inside p-3.5 rounded-lg bg-canvas border border-border/70">
+        <ol className="mt-2 text-sm text-default font-normal leading-relaxed space-y-1.5 list-decimal list-inside p-3.5 rounded-lg bg-canvas border border-border/70 wrap-anywhere">
           {testCase.steps.map((step, i) => (
             <li key={i} className="text-default font-medium">{step}</li>
           ))}
@@ -230,14 +230,14 @@ export function CaseCard({ testCase, projectId, githubRepo, onEdit, onDelete, on
       </CaseDisclosurePanel>
 
       <CaseDisclosurePanel isOpen={expectedOpen && Boolean(testCase.expectedResult)}>
-        <div className="mt-2 text-sm text-default font-normal bg-canvas border border-border/70 rounded-lg p-3.5 leading-relaxed">
+        <div className="mt-2 text-sm text-default font-normal bg-canvas border border-border/70 rounded-lg p-3.5 leading-relaxed wrap-anywhere">
           <p className="text-xs font-semibold text-muted mb-1">{t('suites.expectedResult')}:</p>
           <p className="font-medium text-default">{testCase.expectedResult}</p>
         </div>
       </CaseDisclosurePanel>
 
       <CaseDisclosurePanel isOpen={observationsOpen && observations.length > 0}>
-        <ul className="mt-2 space-y-1.5 rounded-lg border border-ai/30 bg-ai-bg/30 p-3.5 text-sm leading-relaxed">
+        <ul className="mt-2 space-y-1.5 rounded-lg border border-ai/30 bg-ai-bg/30 p-3.5 text-sm leading-relaxed wrap-anywhere">
           {observations.map((observation, i) => (
             <li key={i} className="text-default font-medium">
               {observation}

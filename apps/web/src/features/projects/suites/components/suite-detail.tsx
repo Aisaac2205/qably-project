@@ -254,15 +254,15 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             )}
           </div>
           {suite.description && (
-            <p className="text-sm text-muted max-w-[65ch] text-wrap-pretty">
+            <p className="text-sm text-muted max-w-[65ch] text-pretty wrap-anywhere">
               {suite.description}
             </p>
           )}
           {suite.tags.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
               {suite.tags.map((tag) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
+                <Badge key={tag} variant="outline" className="max-w-full text-xs" title={tag}>
+                  <span className="min-w-0 truncate">{tag}</span>
                 </Badge>
               ))}
             </div>
@@ -345,7 +345,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           <h2 className="text-base font-semibold text-default">
             {t('suites.testCasesCount', { count: suite.cases.length })}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <SelectSimple
               options={buildCaseResultOptions(t)}
               value={resultFilter}

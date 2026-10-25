@@ -99,7 +99,7 @@ export function DocumentWithAeris({
 
   if (showPrimary && showStale) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {renderTrigger(primaryMode, <AerisIcon size={primary ? 16 : 14} />, compactLabel, label)}
         {renderTrigger(
           'stale-locale',

@@ -71,8 +71,8 @@ function SuiteRowImpl({ suite }: SuiteRowProps) {
         {suite.tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
             {suite.tags.map((tagItem) => (
-              <Badge key={tagItem} variant="outline" className="text-xs font-normal">
-                {tagItem}
+              <Badge key={tagItem} variant="outline" className="max-w-full text-xs font-normal" title={tagItem}>
+                <span className="min-w-0 truncate">{tagItem}</span>
               </Badge>
             ))}
           </div>
