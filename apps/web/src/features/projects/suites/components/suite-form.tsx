@@ -172,7 +172,7 @@ function CaseListItem({
           aria-label={t('suites.deleteCaseNamed', {
             name: trimmedName || t('suites.untitledCase'),
           })}
-          className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted opacity-0 transition-colors hover:bg-fail-bg/40 hover:text-fail focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 group-hover:opacity-100"
+          className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted opacity-0 transition-colors hover:bg-fail-bg/40 hover:text-fail focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 group-hover:opacity-100 pointer-coarse:opacity-100"
         >
           <Trash size={14} aria-hidden="true" />
         </button>

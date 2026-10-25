@@ -35,7 +35,7 @@ export function CaseActionsMenu({
     <Menu>
       <MenuTrigger
         aria-label={t('suites.caseActions')}
-        className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       >
         <DotsThree size={16} weight="bold" aria-hidden="true" />
       </MenuTrigger>

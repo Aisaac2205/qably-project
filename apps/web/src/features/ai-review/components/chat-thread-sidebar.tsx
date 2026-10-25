@@ -170,7 +170,7 @@ export function ChatThreadSidebar({
                           'absolute top-1/2 right-1 inline-flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md md:size-7',
                           'text-muted transition-[opacity,color,background-color] duration-150 hover:bg-fail-bg hover:text-fail',
                           'focus-visible:outline-2 focus-visible:outline-primary',
-                          'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100',
+                          'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100',
                         )}
                       >
                         <Trash size={14} aria-hidden="true" />

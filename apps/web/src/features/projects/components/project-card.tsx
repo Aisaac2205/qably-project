@@ -65,7 +65,7 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
           <Menu>
             <MenuTrigger
               aria-label={t('projects.projectActions')}
-              className="relative z-10 opacity-0 group-hover:opacity-100 size-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-default hover:bg-surface-hover transition-colors focus-visible:opacity-100 data-[popup-open]:opacity-100 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+              className="relative z-10 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 size-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-default hover:bg-surface-hover transition-colors focus-visible:opacity-100 data-[popup-open]:opacity-100 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
             >
               <DotsThreeVertical size={14} weight="bold" aria-hidden="true" />
             </MenuTrigger>
