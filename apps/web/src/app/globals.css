@@ -377,6 +377,16 @@ button:focus-visible,
   outline: none !important;
 }
 
+/* iOS Safari zooms into any focused field under 16px and never zooms back
+   out. Unlayered, so it outranks the text-sm/text-xs utilities on touch. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 .resizable-split-pane {
   width: 100%;
 }
