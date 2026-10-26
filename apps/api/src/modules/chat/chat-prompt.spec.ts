@@ -183,6 +183,61 @@ describe('buildChatSystemInstruction', () => {
       /every field of every case/i,
     );
   });
+
+  describe('voice', () => {
+    it('sets a senior QA colleague voice right after the identity and language rules', () => {
+      const es = buildChatSystemInstruction('es');
+      const en = buildChatSystemInstruction('en');
+
+      expect(es).toMatch(/colega de QA/i);
+      expect(en).toMatch(/QA colleague/i);
+      for (const instruction of [es, en]) {
+        expect(instruction.indexOf(PROJECT_DATA_OPEN)).toBeGreaterThan(
+          instruction.search(/colega de QA|QA colleague/i),
+        );
+      }
+    });
+
+    it('asks for an opinion framed as risk and a concrete next step, not a neutral summary', () => {
+      expect(buildChatSystemInstruction('es')).toMatch(/riesgo/i);
+      expect(buildChatSystemInstruction('es')).toMatch(/siguiente paso/i);
+      expect(buildChatSystemInstruction('en')).toMatch(/risk/i);
+      expect(buildChatSystemInstruction('en')).toMatch(/next step/i);
+    });
+
+    it('keeps project facts tied to the data blocks but allows general QA advice labelled as such', () => {
+      expect(buildChatSystemInstruction('es')).toMatch(
+        /sobre este proyecto[\s\S]*solo de esos bloques/i,
+      );
+      expect(buildChatSystemInstruction('es')).toMatch(/criterio general/i);
+      expect(buildChatSystemInstruction('en')).toMatch(
+        /about this project[\s\S]*only from those blocks/i,
+      );
+      expect(buildChatSystemInstruction('en')).toMatch(/general judgment/i);
+    });
+
+    it('declares general advice that cites no project data as insufficient grounding', () => {
+      expect(buildChatSystemInstruction('es')).toMatch(
+        /"insufficient"[\s\S]*criterio general|criterio general[\s\S]*"insufficient"/i,
+      );
+      expect(buildChatSystemInstruction('en')).toMatch(
+        /"insufficient"[\s\S]*general judgment|general judgment[\s\S]*"insufficient"/i,
+      );
+    });
+
+    it('guides the reply format: short markdown without repeating the case cards', () => {
+      expect(buildChatSystemInstruction('es')).toMatch(/markdown/i);
+      expect(buildChatSystemInstruction('es')).toMatch(/tarjetas/i);
+      expect(buildChatSystemInstruction('en')).toMatch(/markdown/i);
+      expect(buildChatSystemInstruction('en')).toMatch(/cards/i);
+    });
+
+    it('uses informal "tú" Spanish throughout, never the voseo', () => {
+      expect(buildChatSystemInstruction('es')).not.toMatch(
+        /podés|tenés|querés|sabés|decile|poné|listá|citás|dejá|mirá|fijate|\bvos\b/i,
+      );
+    });
+  });
 });
 
 describe('buildGroundingDeclineReply', () => {
