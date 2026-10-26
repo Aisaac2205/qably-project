@@ -546,12 +546,12 @@
     "activitySuitesCases_other": "{{count}} suites · {{passed}}/{{total}} cases"
   },
   "statisticsPdf": {
-    "download": "Download PDF",
-    "downloadAria_one": "Download PDF of the statistics for the last {{count}} day",
-    "downloadAria_other": "Download PDF of the statistics for the last {{count}} days",
+    "print": "Print PDF",
+    "printAria_one": "Print PDF of the statistics for the last {{count}} day",
+    "printAria_other": "Print PDF of the statistics for the last {{count}} days",
     "generating": "Preparing PDF…",
     "errorTitle": "The PDF could not be generated",
-    "errorDescription": "Your statistics were not changed. Try the download again.",
+    "errorDescription": "Your statistics were not changed. Try printing again.",
     "documentTitle": "Qably — Quality statistics report",
     "scopeLabel": "Scope",
     "scopeOrganization": "All projects",

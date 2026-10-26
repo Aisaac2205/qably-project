@@ -10,7 +10,7 @@ practice this redesign introduced.
 `dashboard-page.tsx` renders, in order, inside a single lifted `period` state (`useState<DashboardPeriod>(7)`):
 
 1. `DashboardHeader` — subtitle, a period dropdown (7, 30 or 90 days) and, after it, the
-   "Download PDF" button (see "Statistics PDF export" below).
+   "Print PDF" button (see "Statistics PDF export" below).
 2. `KpiStrip` — 4 `KpiStatCard`s (executed cases, runs, failed cases, failed runs), each with a
    mini area chart and a trend against the previous window.
 3. `PassRateHero` — full-width executed-cases comparison chart (see "The hero shows executed
@@ -34,10 +34,10 @@ table, the gauge or the activity card, which all read from `GET /dashboard/overv
 
 The thesis requires the central panel to present the key quality statistics (percentage of tests
 executed, defects detected and the historical trend of each project's state) and the system to
-provide automated reporting. The "Download PDF" button turns what the screen shows into a file the
-user can keep, print or attach.
+provide automated reporting. The "Print PDF" button turns what the screen shows into a PDF and opens
+the browser's print dialog, from which the user can print or save it.
 
-**Where it lives.** One `DownloadStatisticsPdfButton` (`apps/web/src/features/statistics-pdf`) sits
+**Where it lives.** One `PrintStatisticsPdfButton` (`apps/web/src/features/statistics-pdf`) sits
 right after the period dropdown in `DashboardHeader` (organization scope, through its `actions`
 slot) and in the `PageHeader` actions of `/projects/[id]/quality` (project scope).
 
@@ -68,8 +68,8 @@ dash, following `docs/DASHBOARD_METRICS.md`.
 fully formatted view model (locale-aware numbers and dates, translated copy), unit-tested on its
 own. `@react-pdf/renderer` (pinned exact) is reached only through `lib/render-statistics-pdf.tsx`,
 which the hook loads with a dynamic `import()` on click, so the renderer never enters the initial
-bundle. The file downloads as `qably-statistics-<scope>-<period>d-<YYYY-MM-DD>.pdf`; a failure
-shows an error toast and leaves the button usable.
+bundle. The PDF is loaded into a hidden frame (`lib/print-blob.ts`) and the browser's print dialog
+opens on it; nothing is downloaded. A failure shows an error toast and leaves the button usable.
 
 **Type and colour.** The PDF embeds Geist Sans and Geist Mono from `apps/web/public/fonts/geist`
 (SIL OFL, licence beside the files), which cover every Spanish accent; numbers set in Geist Mono.

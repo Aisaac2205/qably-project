@@ -546,12 +546,12 @@
     "activitySuitesCases_other": "{{count}} suites · {{passed}}/{{total}} casos"
   },
   "statisticsPdf": {
-    "download": "Descargar PDF",
-    "downloadAria_one": "Descargar PDF de las estadísticas del último {{count}} día",
-    "downloadAria_other": "Descargar PDF de las estadísticas de los últimos {{count}} días",
+    "print": "Imprimir PDF",
+    "printAria_one": "Imprimir PDF de las estadísticas del último {{count}} día",
+    "printAria_other": "Imprimir PDF de las estadísticas de los últimos {{count}} días",
     "generating": "Preparando PDF…",
     "errorTitle": "No se pudo generar el PDF",
-    "errorDescription": "Tus estadísticas no se modificaron. Vuelve a intentar la descarga.",
+    "errorDescription": "Tus estadísticas no se modificaron. Vuelve a intentar la impresión.",
     "documentTitle": "Qably — Reporte de estadísticas de calidad",
     "scopeLabel": "Alcance",
     "scopeOrganization": "Todos los proyectos",

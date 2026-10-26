@@ -9,7 +9,7 @@ import { ProjectsTable } from '@/features/dashboard/components/projects-table'
 import { CasesGaugeCard } from '@/features/dashboard/components/cases-gauge-card'
 import { ChannelsCard } from '@/features/dashboard/components/channels-card'
 import { ActivityCard } from '@/features/dashboard/components/activity-card'
-import { DownloadStatisticsPdfButton } from '@/features/statistics-pdf/components/download-statistics-pdf-button'
+import { PrintStatisticsPdfButton } from '@/features/statistics-pdf/components/print-statistics-pdf-button'
 
 export function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>(7)
@@ -22,7 +22,7 @@ export function DashboardPage() {
       <DashboardHeader
         period={period}
         onPeriodChange={setPeriod}
-        actions={<DownloadStatisticsPdfButton period={period} />}
+        actions={<PrintStatisticsPdfButton period={period} />}
       />
       <KpiStrip period={period} />
       <PassRateHero period={period} />

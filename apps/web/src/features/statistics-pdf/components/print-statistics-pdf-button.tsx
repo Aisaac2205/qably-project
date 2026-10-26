@@ -1,21 +1,21 @@
 'use client'
 
-import { CircleNotch, FilePdf } from '@phosphor-icons/react'
+import { CircleNotch, Printer } from '@phosphor-icons/react'
 import type { DashboardPeriod } from '@qably/types'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n'
-import { useDownloadStatisticsPdf } from '../hooks/use-download-statistics-pdf'
+import { usePrintStatisticsPdf } from '../hooks/use-print-statistics-pdf'
 
-export interface DownloadStatisticsPdfButtonProps {
+export interface PrintStatisticsPdfButtonProps {
   readonly period: DashboardPeriod
   readonly projectId?: string
   readonly projectName?: string
 }
 
-export function DownloadStatisticsPdfButton({ period, projectId, projectName }: DownloadStatisticsPdfButtonProps) {
+export function PrintStatisticsPdfButton({ period, projectId, projectName }: PrintStatisticsPdfButtonProps) {
   const { t } = useTranslation()
-  const { download, isReady, isGenerating } = useDownloadStatisticsPdf({ period, projectId, projectName })
-  const Icon = isGenerating ? CircleNotch : FilePdf
+  const { print, isReady, isGenerating } = usePrintStatisticsPdf({ period, projectId, projectName })
+  const Icon = isGenerating ? CircleNotch : Printer
 
   return (
     <>
@@ -26,8 +26,8 @@ export function DownloadStatisticsPdfButton({ period, projectId, projectName }: 
         disabled={!isReady || isGenerating}
         focusableWhenDisabled
         aria-busy={isGenerating || undefined}
-        aria-label={isGenerating ? undefined : t('statisticsPdf.downloadAria', { count: period })}
-        onClick={() => void download()}
+        aria-label={isGenerating ? undefined : t('statisticsPdf.printAria', { count: period })}
+        onClick={() => void print()}
       >
         <Icon
           size={16}
@@ -35,7 +35,7 @@ export function DownloadStatisticsPdfButton({ period, projectId, projectName }: 
           aria-hidden="true"
           className={isGenerating ? 'animate-spin motion-reduce:animate-none' : undefined}
         />
-        {isGenerating ? t('statisticsPdf.generating') : t('statisticsPdf.download')}
+        {isGenerating ? t('statisticsPdf.generating') : t('statisticsPdf.print')}
       </Button>
       <span role="status" className="sr-only">
         {isGenerating ? t('statisticsPdf.generating') : ''}

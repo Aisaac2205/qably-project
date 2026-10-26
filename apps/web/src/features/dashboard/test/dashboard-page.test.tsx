@@ -96,7 +96,7 @@ describe('DashboardPage', () => {
     })
 
     const period = screen.getByRole('button', { name: 'Time period' })
-    const download = screen.getByRole('button', { name: 'Download PDF of the statistics for the last 7 days' })
+    const download = screen.getByRole('button', { name: 'Print PDF of the statistics for the last 7 days' })
     expect(download.parentElement).toContainElement(period)
   })
 

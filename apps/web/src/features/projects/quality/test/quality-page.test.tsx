@@ -182,7 +182,7 @@ describe('QualityPage', () => {
     const header = (await screen.findByRole('heading', { name: 'Ecommerce App' })).closest('header')
     expect(header).not.toBeNull()
     expect(
-      within(header as HTMLElement).getByRole('button', { name: 'Download PDF of the statistics for the last 30 days' }),
+      within(header as HTMLElement).getByRole('button', { name: 'Print PDF of the statistics for the last 30 days' }),
     ).toBeInTheDocument()
     expect(within(header as HTMLElement).getByRole('button', { name: 'Time period' })).toBeInTheDocument()
   })

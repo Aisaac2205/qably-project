@@ -9,7 +9,7 @@ import AnimatedDropdown from '@/components/ui/animated-dropdown'
 import { KpiStrip } from '@/features/dashboard/components/kpi-strip'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { projectRootPath } from '@/features/projects/lib/routes'
-import { DownloadStatisticsPdfButton } from '@/features/statistics-pdf/components/download-statistics-pdf-button'
+import { PrintStatisticsPdfButton } from '@/features/statistics-pdf/components/print-statistics-pdf-button'
 import { useTranslation } from '@/lib/i18n'
 import { PassRateDeltaTrend } from './pass-rate-delta-trend'
 import { DailyActivityBarChart } from './daily-activity-bar-chart'
@@ -47,7 +47,7 @@ export function QualityPage({ projectId }: { projectId: string }) {
                 onClick: () => setPeriod(value),
               }))}
             />
-            <DownloadStatisticsPdfButton period={period} projectId={projectId} projectName={project?.name} />
+            <PrintStatisticsPdfButton period={period} projectId={projectId} projectName={project?.name} />
           </>
         }
       />

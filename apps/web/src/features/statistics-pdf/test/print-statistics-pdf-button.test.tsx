@@ -5,10 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardOverviewRecord, DashboardPeriod } from '@qably/types'
 import { dashboardOverviewFixture } from '@/test/dashboard-api-stub'
 import type { StatisticsReport } from '@/features/statistics-pdf/lib/build-statistics-report'
-import { DownloadStatisticsPdfButton } from '@/features/statistics-pdf/components/download-statistics-pdf-button'
+import { PrintStatisticsPdfButton } from '@/features/statistics-pdf/components/print-statistics-pdf-button'
 
 const getDashboardOverview = vi.fn()
 const renderStatisticsPdf = vi.fn()
+const printBlob = vi.fn()
 const notifyError = vi.fn()
 
 vi.mock('@/features/dashboard/api/dashboard.api', () => ({
@@ -21,19 +22,20 @@ vi.mock('@/features/statistics-pdf/lib/render-statistics-pdf', () => ({
   renderStatisticsPdf: (...args: unknown[]) => renderStatisticsPdf(...args),
 }))
 
+// The print module is the browser boundary: the real one drives a hidden frame jsdom cannot load.
+vi.mock('@/features/statistics-pdf/lib/print-blob', () => ({
+  printBlob: (...args: unknown[]) => printBlob(...args),
+}))
+
 vi.mock('@/lib/notify', () => ({
   notify: { error: (...args: unknown[]) => notifyError(...args) },
 }))
-
-const createObjectURL = vi.fn(() => 'blob:qably-report')
-const revokeObjectURL = vi.fn()
-let downloads: { href: string; download: string }[] = []
 
 function renderButton(props: { period?: DashboardPeriod; projectId?: string; projectName?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   return render(
     <QueryClientProvider client={client}>
-      <DownloadStatisticsPdfButton period={props.period ?? 30} projectId={props.projectId} projectName={props.projectName} />
+      <PrintStatisticsPdfButton period={props.period ?? 30} projectId={props.projectId} projectName={props.projectName} />
     </QueryClientProvider>,
   )
 }
@@ -48,16 +50,12 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-describe('DownloadStatisticsPdfButton', () => {
+describe('PrintStatisticsPdfButton', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    downloads = []
     getDashboardOverview.mockResolvedValue(dashboardOverviewFixture)
     renderStatisticsPdf.mockResolvedValue(new Blob(['%PDF-1.3'], { type: 'application/pdf' }))
-    Object.assign(URL, { createObjectURL, revokeObjectURL })
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-      downloads.push({ href: this.href, download: this.download })
-    })
+    printBlob.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -69,7 +67,7 @@ describe('DownloadStatisticsPdfButton', () => {
     getDashboardOverview.mockReturnValue(pending.promise)
     renderButton()
 
-    const button = screen.getByRole('button', { name: 'Download PDF of the statistics for the last 30 days' })
+    const button = screen.getByRole('button', { name: 'Print PDF of the statistics for the last 30 days' })
     expect(button).toHaveAttribute('aria-disabled', 'true')
 
     pending.resolve(dashboardOverviewFixture)
@@ -81,42 +79,39 @@ describe('DownloadStatisticsPdfButton', () => {
     renderButton({ period: 30 })
 
     await waitFor(() => expect(getDashboardOverview).toHaveBeenCalled())
-    expect(screen.getByRole('button', { name: /Download PDF/ })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: /Print PDF/ })).toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('renders the selected period and downloads it under a descriptive file name', async () => {
+  it('renders the selected period and opens the print dialog instead of downloading', async () => {
     const user = userEvent.setup()
     renderButton({ period: 30 })
 
-    const button = await screen.findByRole('button', { name: 'Download PDF of the statistics for the last 30 days' })
+    const button = await screen.findByRole('button', { name: 'Print PDF of the statistics for the last 30 days' })
     await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled', 'true'))
     await user.click(button)
 
-    await waitFor(() => expect(downloads).toHaveLength(1))
+    await waitFor(() => expect(printBlob).toHaveBeenCalledTimes(1))
     const report = renderStatisticsPdf.mock.calls[0]?.[0] as StatisticsReport
     expect(report.title).toBe('Qably — Quality statistics report')
     expect(report.meta[0]).toEqual({ label: 'Scope', value: 'All projects' })
     expect(report.projects).not.toBeNull()
-    expect(downloads[0]?.href).toBe('blob:qably-report')
-    expect(downloads[0]?.download).toMatch(/^qably-statistics-all-projects-30d-\d{4}-\d{2}-\d{2}\.pdf$/)
-    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:qably-report'))
+    expect(printBlob.mock.calls[0]?.[0]).toBeInstanceOf(Blob)
     expect(notifyError).not.toHaveBeenCalled()
   })
 
-  it('scopes the report and the file name to the project', async () => {
+  it('scopes the report to the project', async () => {
     const user = userEvent.setup()
     renderButton({ period: 30, projectId: 'project-1', projectName: 'Checkout Web' })
 
-    const button = await screen.findByRole('button', { name: /Download PDF/ })
+    const button = await screen.findByRole('button', { name: /Print PDF/ })
     await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled', 'true'))
     await user.click(button)
 
-    await waitFor(() => expect(downloads).toHaveLength(1))
+    await waitFor(() => expect(printBlob).toHaveBeenCalledTimes(1))
     expect(getDashboardOverview).toHaveBeenCalledWith(30, expect.any(String), 'project-1', expect.anything())
     const report = renderStatisticsPdf.mock.calls[0]?.[0] as StatisticsReport
     expect(report.meta[0]).toEqual({ label: 'Scope', value: 'Checkout Web' })
     expect(report.projects).toBeNull()
-    expect(downloads[0]?.download).toMatch(/^qably-statistics-checkout-web-30d-/)
   })
 
   it('shows a busy state while the PDF is being generated', async () => {
@@ -125,7 +120,7 @@ describe('DownloadStatisticsPdfButton', () => {
     renderStatisticsPdf.mockReturnValue(rendering.promise)
     renderButton()
 
-    const button = await screen.findByRole('button', { name: /Download PDF/ })
+    const button = await screen.findByRole('button', { name: /Print PDF/ })
     await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled', 'true'))
     await user.click(button)
 
@@ -139,7 +134,7 @@ describe('DownloadStatisticsPdfButton', () => {
 
     rendering.resolve(new Blob(['%PDF'], { type: 'application/pdf' }))
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Download PDF/ })).not.toHaveAttribute('aria-busy'),
+      expect(screen.getByRole('button', { name: /Print PDF/ })).not.toHaveAttribute('aria-busy'),
     )
   })
 
@@ -148,16 +143,29 @@ describe('DownloadStatisticsPdfButton', () => {
     renderStatisticsPdf.mockRejectedValue(new Error('font failed to load'))
     renderButton()
 
-    const button = await screen.findByRole('button', { name: /Download PDF/ })
+    const button = await screen.findByRole('button', { name: /Print PDF/ })
     await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled', 'true'))
     await user.click(button)
 
     await waitFor(() =>
       expect(notifyError).toHaveBeenCalledWith('The PDF could not be generated', {
-        description: 'Your statistics were not changed. Try the download again.',
+        description: 'Your statistics were not changed. Try printing again.',
       }),
     )
-    expect(downloads).toHaveLength(0)
-    expect(screen.getByRole('button', { name: /Download PDF/ })).not.toHaveAttribute('aria-disabled', 'true')
+    expect(printBlob).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /Print PDF/ })).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('reports a failure when the browser cannot open the print dialog', async () => {
+    const user = userEvent.setup()
+    printBlob.mockRejectedValue(new Error('print blocked'))
+    renderButton()
+
+    const button = await screen.findByRole('button', { name: /Print PDF/ })
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled', 'true'))
+    await user.click(button)
+
+    await waitFor(() => expect(notifyError).toHaveBeenCalledWith('The PDF could not be generated', expect.anything()))
+    expect(screen.getByRole('button', { name: /Print PDF/ })).not.toHaveAttribute('aria-disabled', 'true')
   })
 })
