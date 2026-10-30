@@ -117,6 +117,7 @@ interface FakePrisma {
     findFirst: jest.Mock;
   };
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 }
 
 function createPrisma(): FakePrisma {
@@ -186,6 +187,7 @@ function createPrisma(): FakePrisma {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn().mockResolvedValue([{ name: 'Accepts a valid card' }]),
   };
   prisma.$transaction.mockImplementation(
     (fn: (tx: FakePrisma) => Promise<unknown>) => fn(prisma),
