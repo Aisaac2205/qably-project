@@ -747,6 +747,7 @@ describe('ChatService', () => {
           suiteId: 'suite-1',
           chatCaseKey: 'message-2:new:0',
           promptVersion: CHAT_PROMPT_VERSION,
+          locale: 'es',
         }),
       }),
     );
@@ -2261,6 +2262,7 @@ describe('ChatService', () => {
             suiteId: 'suite-1',
             automationKey: 'Checkout > rejects an expired card',
             chatCaseKey: 'message-2:case-1',
+            locale: 'es',
           }),
         }),
       );
@@ -2271,6 +2273,43 @@ describe('ChatService', () => {
             excerpt: 'it("rejects an expired card", () => {})',
           }),
         }),
+      );
+    });
+
+    it("records the reviewer's own locale on the proposal, not a hardcoded default", async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: {
+          provider: 'GITHUB',
+          repo: 'acme/shop',
+          encryptedAccessToken: null,
+        },
+      });
+      prisma.user.findUnique.mockResolvedValue({ locale: 'en' });
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        {
+          caseIndex: 0,
+        },
+      );
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledWith(
+        containing({ data: containing({ locale: 'en' }) }),
       );
     });
 

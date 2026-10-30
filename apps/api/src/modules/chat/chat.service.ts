@@ -741,6 +741,11 @@ export class ChatService {
       read.kind === 'ok' ? read.cases[input.caseIndex] : undefined;
     if (suggested === undefined) return err('case-not-found');
 
+    // The locale Aeris actually wrote the suggestion in: without it, the
+    // published version's locale is null and the case reads as stale the
+    // moment it is approved, inviting a redundant re-document.
+    const locale = await this.resolveLocale(user.id);
+
     if (suggested.targetTestCaseId !== undefined) {
       return this.sendTargetedToReview(
         org.organizationId,
@@ -749,6 +754,7 @@ export class ChatService {
         messageId,
         suggested,
         suggested.targetTestCaseId,
+        locale,
       );
     }
 
@@ -844,6 +850,7 @@ export class ChatService {
             expectedResult: suggested.expectedResult,
             priority: suggested.priority,
             promptVersion: CHAT_PROMPT_VERSION,
+            locale,
             duplicateKind: classification.kind,
             matchedCaseId: classification.matchedCaseId,
             duplicateScore: classification.score,
@@ -945,6 +952,7 @@ export class ChatService {
     messageId: string,
     suggested: SuggestedCase,
     targetTestCaseId: string,
+    locale: 'es' | 'en',
   ): Promise<Result<SendToReviewView, ChatError>> {
     const chatCaseKey = targetedChatCaseKey(messageId, targetTestCaseId);
 
@@ -1017,6 +1025,7 @@ export class ChatService {
             expectedResult: suggested.expectedResult,
             priority: suggested.priority,
             promptVersion: CHAT_PROMPT_VERSION,
+            locale,
             duplicateKind: classification.kind,
             matchedCaseId: classification.matchedCaseId,
             duplicateScore: classification.score,
