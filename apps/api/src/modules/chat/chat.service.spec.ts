@@ -126,7 +126,7 @@ function createPrisma(): FakePrisma {
     },
     testCase: {
       findMany: jest.fn().mockImplementation((args: { where: unknown }) => {
-        const where = args.where as { id?: unknown };
+        const where = args.where as { id?: unknown; suiteId?: unknown };
         if (where.id !== undefined) {
           return Promise.resolve([
             {
@@ -142,6 +142,12 @@ function createPrisma(): FakePrisma {
               automationFilePath: 'src/checkout.spec.ts',
             },
           ]);
+        }
+        // Duplicate-candidate lookups (classifyChatProposal) key on suiteId,
+        // never on id: no other cases by default, so classification stays
+        // 'none' unless a test explicitly sets up a candidate to match.
+        if (where.suiteId !== undefined) {
+          return Promise.resolve([]);
         }
         return Promise.resolve([{ name: 'Accepts a valid card' }]);
       }),
@@ -707,6 +713,78 @@ describe('ChatService', () => {
     const calls = prisma.extractedProposal.create.mock.calls as unknown[][];
     const created = calls[0][0] as { data: { targetTestCaseId?: string } };
     expect(created.data.targetTestCaseId).toBeUndefined();
+  });
+
+  it('classifies an untargeted suggestion as a possible duplicate of an existing case with the same title', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: 'src/checkout.spec.ts' });
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    });
+    prisma.testCase.findMany.mockImplementation(
+      (args: { where: { suiteId?: unknown } }) =>
+        Promise.resolve(
+          args.where.suiteId === 'suite-1'
+            ? [
+                {
+                  id: 'case-5',
+                  suiteId: 'suite-1',
+                  automationKey: null,
+                  name: suggestedCase.title,
+                  steps: ['Trigger nightly export'],
+                  expectedResult: 'Logs ship successfully',
+                },
+              ]
+            : [],
+        ),
+    );
+    const caseContextBuilder = fakeCaseContextBuilder(
+      undefined,
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: {
+          kind: 'file-head',
+          excerpt: 'export function checkout() {}',
+        },
+      }),
+    );
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      caseContextBuilder,
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      { caseIndex: 0 },
+    );
+
+    expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+    expect(prisma.extractedProposal.create).toHaveBeenCalledWith(
+      containing({
+        data: containing({
+          duplicateKind: 'possible_duplicate',
+          matchedCaseId: 'case-5',
+          duplicateScore: 1,
+          duplicateReasons: ['same-title'],
+          classifiedAt: expect.any(Date),
+        }),
+      }),
+    );
   });
 
   it('creates the same SOURCE_EXCERPT proposal via a Bitbucket connection, proving the untargeted flow is provider-agnostic', async () => {
@@ -2151,6 +2229,66 @@ describe('ChatService', () => {
           data: containing({
             uri: 'https://github.com/acme/shop/blob/sha123/src/checkout.spec.ts#L10-L12',
             excerpt: 'it("rejects an expired card", () => {})',
+          }),
+        }),
+      );
+    });
+
+    it('classifies the targeted proposal as an update matching the target case by automation key', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: {
+          provider: 'GITHUB',
+          repo: 'acme/shop',
+          encryptedAccessToken: null,
+        },
+      });
+      prisma.testCase.findMany.mockImplementation(
+        (args: { where: { suiteId?: unknown } }) =>
+          Promise.resolve(
+            typeof args.where.suiteId === 'string'
+              ? [
+                  {
+                    id: 'case-1',
+                    suiteId: 'suite-1',
+                    automationKey: 'Checkout > rejects an expired card',
+                    name: 'Rejects an expired card',
+                    steps: ['Open checkout'],
+                    expectedResult: 'The payment is refused',
+                  },
+                ]
+              : [],
+          ),
+      );
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+      expect(prisma.extractedProposal.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            duplicateKind: 'update',
+            matchedCaseId: 'case-1',
+            duplicateScore: 1,
+            duplicateReasons: ['same-automation-key'],
+            classifiedAt: expect.any(Date),
           }),
         }),
       );

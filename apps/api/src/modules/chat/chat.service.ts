@@ -18,6 +18,11 @@ import { buildBlobUrl } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { readSuiteCaseCounts } from '../suites/lib/suite-case-counts';
 import {
+  classifyProposal,
+  type ClassifyProposalCandidate,
+  type ProposalClassification,
+} from '../review/lib/classify-proposal';
+import {
   buildGroundingManifest,
   groundingDeclarationSchema,
   resolveGrounding,
@@ -261,6 +266,35 @@ function parseUntargetedChatCaseKey(
   if (messageId === '' || Number.isNaN(caseIndex)) return null;
 
   return { messageId, caseIndex };
+}
+
+const CASE_CANDIDATE_SELECT = {
+  id: true,
+  suiteId: true,
+  automationKey: true,
+  name: true,
+  steps: true,
+  expectedResult: true,
+} as const;
+
+interface CaseCandidateRow {
+  id: string;
+  suiteId: string;
+  automationKey: string | null;
+  name: string;
+  steps: string[];
+  expectedResult: string;
+}
+
+function toClassifyCandidate(row: CaseCandidateRow): ClassifyProposalCandidate {
+  return {
+    id: row.id,
+    suiteId: row.suiteId,
+    automationKey: row.automationKey,
+    title: row.name,
+    steps: row.steps,
+    expectedResult: row.expectedResult,
+  };
 }
 
 function lineAnchor(
@@ -770,6 +804,17 @@ export class ChatService {
       return err('no-code-evidence');
     }
 
+    const classification = await this.classifyChatProposal(
+      projectId,
+      suite.id,
+      {
+        automationKey: null,
+        title: suggested.title,
+        steps: suggested.steps,
+        expectedResult: suggested.expectedResult,
+      },
+    );
+
     try {
       const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
         const evidenceRow = await tx.evidence.create({
@@ -797,6 +842,11 @@ export class ChatService {
             expectedResult: suggested.expectedResult,
             priority: suggested.priority,
             promptVersion: CHAT_PROMPT_VERSION,
+            duplicateKind: classification.kind,
+            matchedCaseId: classification.matchedCaseId,
+            duplicateScore: classification.score,
+            duplicateReasons: classification.reasons,
+            classifiedAt: new Date(),
           },
           select: { id: true },
         });
@@ -835,6 +885,55 @@ export class ChatService {
       batchId: proposalId,
       count: 1,
     });
+  }
+
+  /**
+   * Mirrors ReclassifySuiteProcessor's duplicate detection for proposals Aeris
+   * sends to review, so they carry the same duplicateKind/matchedCaseId signal
+   * a reviewer sees for a push-originated proposal, instead of always 'none'.
+   */
+  private async classifyChatProposal(
+    projectId: string,
+    suiteId: string,
+    proposal: {
+      automationKey: string | null;
+      title: string;
+      steps: readonly string[];
+      expectedResult: string;
+    },
+  ): Promise<ProposalClassification> {
+    const suiteCases = (await this.prisma.testCase.findMany({
+      where: { suiteId },
+      select: CASE_CANDIDATE_SELECT,
+    })) as CaseCandidateRow[];
+
+    const crossSuiteCases =
+      proposal.automationKey === null
+        ? []
+        : ((await this.prisma.testCase.findMany({
+            where: {
+              projectId,
+              suiteId: { not: suiteId },
+              automationKey: proposal.automationKey,
+            },
+            select: CASE_CANDIDATE_SELECT,
+          })) as CaseCandidateRow[]);
+
+    const candidates = [...suiteCases, ...crossSuiteCases].map(
+      toClassifyCandidate,
+    );
+
+    return classifyProposal(
+      {
+        automationKey: proposal.automationKey,
+        suiteId,
+        title: proposal.title,
+        steps: proposal.steps,
+        expectedResult: proposal.expectedResult,
+      },
+      candidates,
+      suiteId,
+    );
   }
 
   private async sendTargetedToReview(
@@ -876,6 +975,17 @@ export class ChatService {
     }
     const evidence = evidenceResult.evidence;
 
+    const classification = await this.classifyChatProposal(
+      projectId,
+      target.suiteId,
+      {
+        automationKey: target.automationKey,
+        title: suggested.title,
+        steps: suggested.steps,
+        expectedResult: suggested.expectedResult,
+      },
+    );
+
     try {
       const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
         const evidenceRow = await tx.evidence.create({
@@ -905,6 +1015,11 @@ export class ChatService {
             expectedResult: suggested.expectedResult,
             priority: suggested.priority,
             promptVersion: CHAT_PROMPT_VERSION,
+            duplicateKind: classification.kind,
+            matchedCaseId: classification.matchedCaseId,
+            duplicateScore: classification.score,
+            duplicateReasons: classification.reasons,
+            classifiedAt: new Date(),
           },
           select: { id: true },
         });
