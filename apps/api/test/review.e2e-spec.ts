@@ -160,6 +160,7 @@ describe('Review (e2e)', () => {
     },
     runCase: { findMany: jest.fn() },
     $transaction: jest.fn(),
+    $queryRawUnsafe: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -196,6 +197,10 @@ describe('Review (e2e)', () => {
     prisma.traceabilityLink.findFirst.mockResolvedValue(null);
     prisma.traceabilityLink.createMany.mockResolvedValue({ count: 3 });
     prisma.runCase.findMany.mockResolvedValue([]);
+    // The row lock approve() takes on the target/matched case before
+    // publishing a version (lockTestCaseForUpdate); no test here exercises
+    // the stale-version check, so no prior version is reported.
+    prisma.$queryRawUnsafe.mockResolvedValue([{ currentVersionId: null }]);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -299,6 +304,7 @@ describe('Review (e2e)', () => {
         name: string;
         suiteId: string;
         suiteName: string;
+        documentation: { queuedAt: string | null; outcomeAt: string | null };
       };
       publishedVersion: {
         version: number;
@@ -317,6 +323,7 @@ describe('Review (e2e)', () => {
       name: 'Empties the cart',
       suiteId: 'suite-9',
       suiteName: 'Cart suite',
+      documentation: { queuedAt: null, outcomeAt: null },
     });
     expect(body.publishedVersion?.version).toBe(2);
     expect(body.publishedVersion?.publishedBy).toEqual({
