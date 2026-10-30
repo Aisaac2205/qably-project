@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Mock } from 'vitest'
-import type { ChatMessageRecord, ChatThreadRecord } from '@qably/types'
+import type { ChatMessageRecord, ChatThreadRecord, SuggestedCaseRecord } from '@qably/types'
 import { ProjectChatPanel } from '@/features/ai-review/components/project-chat-panel'
 import type { ChatStreamDone } from '@/features/ai-review/lib/chat-stream'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
@@ -71,6 +71,7 @@ export function renderChatPanel({
 interface StreamOptions {
   signal?: AbortSignal
   onDelta?: (text: string) => void
+  onCase?: (index: number, suggestedCase: SuggestedCaseRecord) => void
 }
 
 /** Drives a mocked streamMessage by hand: emit deltas, then finish or fail. */
@@ -96,6 +97,8 @@ export function controlStream(streamMessage: Mock) {
 
   return {
     emit: (text: string) => control.options.onDelta?.(text),
+    emitCase: (index: number, suggestedCase: SuggestedCaseRecord) =>
+      control.options.onCase?.(index, suggestedCase),
     finish: (rows: ChatStreamDone) => control.finish(rows),
     fail: (error: unknown) => control.fail(error),
     signal: () => control.options.signal,

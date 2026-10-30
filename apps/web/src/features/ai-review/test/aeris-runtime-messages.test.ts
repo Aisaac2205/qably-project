@@ -35,6 +35,7 @@ describe('buildRuntimeMessages', () => {
       ],
       pendingMessage: null,
       streamingText: '',
+      streamingCases: [],
       isRunning: false,
     })
 
@@ -51,12 +52,28 @@ describe('buildRuntimeMessages', () => {
       messages: [],
       pendingMessage: { content: 'Question', status: 'sending', attachedCases: [attachedCase] },
       streamingText: 'Partial',
+      streamingCases: [],
       isRunning: true,
     })
 
     expect(messages).toEqual([
       { kind: 'pending', content: 'Question', attachedCases: [attachedCase] },
-      { kind: 'streaming', text: 'Partial' },
+      { kind: 'streaming', text: 'Partial', cases: [] },
+    ])
+  })
+
+  it('carries the cases streamed so far on the in-flight reply', () => {
+    const messages = buildRuntimeMessages({
+      messages: [],
+      pendingMessage: { content: 'Question', status: 'sending' },
+      streamingText: 'Here is one:',
+      streamingCases: [suggestedCase],
+      isRunning: true,
+    })
+
+    expect(messages).toEqual([
+      { kind: 'pending', content: 'Question', attachedCases: [] },
+      { kind: 'streaming', text: 'Here is one:', cases: [suggestedCase] },
     ])
   })
 
@@ -66,6 +83,7 @@ describe('buildRuntimeMessages', () => {
         messages: [],
         pendingMessage: { content: 'Question', status: 'error', errorKind: 'throttled' },
         streamingText: '',
+        streamingCases: [],
         isRunning: false,
       }),
     ).toEqual([{ kind: 'pending', content: 'Question', attachedCases: [] }])
@@ -77,6 +95,7 @@ describe('buildRuntimeMessages', () => {
         messages: [],
         pendingMessage: { status: 'unavailable', errorKind: 'provider-unavailable' },
         streamingText: '',
+        streamingCases: [],
         isRunning: false,
       }),
     ).toEqual([])
@@ -145,15 +164,28 @@ describe('convertAerisMessage', () => {
   })
 
   it('marks the streaming reply as running and leaves it empty until text arrives', () => {
-    expect(convertAerisMessage({ kind: 'streaming', text: '' })).toEqual({
+    expect(convertAerisMessage({ kind: 'streaming', text: '', cases: [] })).toEqual({
       id: STREAMING_MESSAGE_ID,
       role: 'assistant',
       status: { type: 'running' },
       content: [],
     })
-    expect(convertAerisMessage({ kind: 'streaming', text: 'Par' }).content).toEqual([
+    expect(convertAerisMessage({ kind: 'streaming', text: 'Par', cases: [] }).content).toEqual([
       { type: 'text', text: 'Par' },
     ])
+  })
+
+  it('adds a streaming-cases data part for each case that has arrived so far', () => {
+    expect(
+      convertAerisMessage({ kind: 'streaming', text: 'Here:', cases: [suggestedCase] }).content,
+    ).toEqual([
+      { type: 'text', text: 'Here:' },
+      { type: 'data-streaming-cases', data: [suggestedCase] },
+    ])
+  })
+
+  it('adds no streaming-cases part before any case has arrived', () => {
+    expect(convertAerisMessage({ kind: 'streaming', text: '', cases: [] }).content).toEqual([])
   })
 
   it('gives the optimistic question a stable id', () => {

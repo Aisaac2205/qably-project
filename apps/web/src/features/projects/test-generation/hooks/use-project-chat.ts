@@ -7,6 +7,7 @@ import type {
   ChatMessageRecord,
   ChatThreadDetailRecord,
   ChatThreadRecord,
+  SuggestedCaseRecord,
 } from '@qably/types'
 import {
   createThread,
@@ -99,6 +100,7 @@ export function useProjectChat(projectId: string) {
   const [pendingMessage, setPendingMessage] = useState<PendingMessage | null>(null)
   const [deleteError, setDeleteError] = useState(false)
   const [streamingText, setStreamingText] = useState('')
+  const [streamingCases, setStreamingCases] = useState<SuggestedCaseRecord[]>([])
   const [isRunning, setIsRunning] = useState(false)
   // While a reply is in flight the visible thread is the snapshot taken when it
   // was sent: the server stores the question first, so a refetch mid-stream
@@ -121,6 +123,7 @@ export function useProjectChat(projectId: string) {
     runRef.current = null
     setPendingMessage(pending)
     setStreamingText('')
+    setStreamingCases([])
     setIsRunning(false)
     setFrozenMessages(null)
   }, [])
@@ -190,6 +193,7 @@ export function useProjectChat(projectId: string) {
       )
       setPendingMessage({ content, status: 'sending', attachedCases })
       setStreamingText('')
+      setStreamingCases([])
       setIsRunning(true)
 
       try {
@@ -213,6 +217,14 @@ export function useProjectChat(projectId: string) {
             onDelta: (delta) => {
               if (isCurrent()) setStreamingText((previous) => previous + delta)
             },
+            onCase: (index, suggestedCase) => {
+              if (!isCurrent()) return
+              setStreamingCases((previous) => {
+                const next = [...previous]
+                next[index] = suggestedCase
+                return next
+              })
+            },
           },
         )
 
@@ -230,6 +242,7 @@ export function useProjectChat(projectId: string) {
         if (!isCurrent()) return
 
         setStreamingText('')
+        setStreamingCases([])
         setIsRunning(false)
 
         const refetchThread = async () => {
@@ -272,6 +285,7 @@ export function useProjectChat(projectId: string) {
     messages: frozenMessages ?? threadQuery.data?.messages ?? [],
     pendingMessage,
     streamingText,
+    streamingCases,
     isRunning,
     deleteError,
     startNewChat,

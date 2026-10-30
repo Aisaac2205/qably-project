@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useExternalStoreRuntime, type AppendMessage } from '@assistant-ui/react'
-import type { AttachedCaseRecord, ChatMessageRecord } from '@qably/types'
+import type { AttachedCaseRecord, ChatMessageRecord, SuggestedCaseRecord } from '@qably/types'
 import type { PendingMessage } from '@/features/projects/test-generation/hooks/use-project-chat'
 import {
   buildRuntimeMessages,
@@ -13,6 +13,7 @@ export interface AerisChatState {
   messages: ChatMessageRecord[]
   pendingMessage: PendingMessage | null
   streamingText: string
+  streamingCases: SuggestedCaseRecord[]
   isRunning: boolean
   send: (text: string, attachedCases?: AttachedCaseRecord[], filePath?: string) => Promise<void>
   cancel: () => void
@@ -42,11 +43,12 @@ export function useAerisRuntime({
   attachedFilePath: string | null
   onAttachmentsSent: () => void
 }) {
-  const { messages, pendingMessage, streamingText, isRunning, send, cancel } = chat
+  const { messages, pendingMessage, streamingText, streamingCases, isRunning, send, cancel } = chat
 
   const runtimeMessages = useMemo(
-    () => buildRuntimeMessages({ messages, pendingMessage, streamingText, isRunning }),
-    [messages, pendingMessage, streamingText, isRunning],
+    () =>
+      buildRuntimeMessages({ messages, pendingMessage, streamingText, streamingCases, isRunning }),
+    [messages, pendingMessage, streamingText, streamingCases, isRunning],
   )
 
   return useExternalStoreRuntime({

@@ -7,6 +7,7 @@ import {
   ASSISTANT_MODEL_NAME,
   type ChatThreadDetailRecord,
   type Suite,
+  type SuggestedCaseRecord,
 } from '@qably/types'
 import {
   assistantRecord,
@@ -360,6 +361,50 @@ describe('ProjectChatPanel', () => {
 
       expect(await screen.findByText('Two cases failed in the last run.')).toBeInTheDocument()
       expect(screen.queryByText('Two cases are failing.')).not.toBeInTheDocument()
+    })
+
+    it('shows a suggested case as soon as it streams in, replaced by the sendable card once done', async () => {
+      const suggestedCase: SuggestedCaseRecord = {
+        title: 'Rejects an expired card',
+        objective: 'Confirm expired cards are refused',
+        preconditions: [],
+        steps: ['Open checkout'],
+        expectedResult: 'The payment is refused',
+        priority: 'high',
+      }
+      listThreads.mockResolvedValue([chatThread])
+      getThread.mockResolvedValueOnce(threadDetailAfterReply).mockReturnValue(new Promise(() => {}))
+      const stream = controlStream(streamMessage)
+      const user = userEvent.setup()
+
+      await renderPanel()
+      await openThread(user)
+      await screen.findByText('There are 4 cases pending review.')
+
+      await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Add one?{enter}')
+      await waitFor(() => expect(streamMessage).toHaveBeenCalled())
+
+      act(() => {
+        stream.emit('Here is one:')
+        stream.emitCase(0, suggestedCase)
+      })
+
+      expect(await screen.findByText('Rejects an expired card')).toBeInTheDocument()
+      expect(screen.getByText('Drafting')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Send to review' })).not.toBeInTheDocument()
+
+      await act(async () => {
+        stream.finish({
+          userMessage: userRecord('message-3', 'Add one?'),
+          assistantMessage: assistantRecord('message-4', 'Here is one:', {
+            suggestedCases: [suggestedCase],
+          }),
+        })
+      })
+
+      expect(await screen.findByRole('button', { name: 'Send to review' })).toBeInTheDocument()
+      expect(screen.queryByText('Drafting')).not.toBeInTheDocument()
+      expect(screen.getByText('Rejects an expired card')).toBeInTheDocument()
     })
 
     it('announces a finished reply once instead of every streamed token', async () => {

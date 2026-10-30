@@ -833,6 +833,7 @@
     "chatRemoveCase": "Quitar {{name}}",
     "chatTooManyCases": "Hay demasiados casos adjuntos a este mensaje. Quita algunos e intenta de nuevo.",
     "chatHumanDocumented": "Este caso fue documentado por una persona. Edítalo directamente en lugar de enviar una propuesta de Aeris.",
+    "chatCaseDrafting": "Redactando",
     "chatProposalReady": "Propuesta lista",
     "chatProposalSent": "Enviada a revisión",
     "chatWhatAerisProposes": "Lo que propone Aeris",

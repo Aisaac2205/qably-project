@@ -2,13 +2,15 @@
 
 import { ActionBarPrimitive, AuiIf, MessagePrimitive, useAuiState } from '@assistant-ui/react'
 import { Check, Copy, Info } from '@phosphor-icons/react'
-import type { AttachedCaseRecord } from '@qably/types'
+import type { AttachedCaseRecord, SuggestedCaseRecord } from '@qably/types'
+import { AerisIcon } from '@/components/icons/aeris-icon'
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import {
   ATTACHED_CASES_PART,
+  STREAMING_CASES_PART,
   SUGGESTED_CASES_PART,
   type AerisMessageCustomMetadata,
   type SuggestedCasesPartData,
@@ -47,6 +49,26 @@ export function AerisUserMessage() {
         <MessagePrimitive.Parts components={{ Text: UserText, data: hideDataParts }} />
       </div>
     </MessagePrimitive.Root>
+  )
+}
+
+/**
+ * A case still arriving mid-stream: title only, no action, since the turn
+ * has no messageId yet to send it to review. It is a different runtime
+ * message than the finished one (STREAMING_MESSAGE_ID vs. the real record
+ * id), which replaces it outright once the reply completes.
+ */
+function StreamingCaseCard({ suggestedCase }: { suggestedCase: SuggestedCaseRecord }) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="animate-enter space-y-1 rounded-xl border border-border bg-surface p-3">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-ai">
+        <AerisIcon size={14} />
+        {t('aiReview.chatCaseDrafting')}
+      </div>
+      <p className="text-sm font-medium text-default">{suggestedCase.title}</p>
+    </div>
   )
 }
 
@@ -110,6 +132,11 @@ export function AerisAssistantMessage({ projectId }: { projectId: string }) {
   )
   const suggestedCases =
     suggestedCasesPart?.type === 'data' ? (suggestedCasesPart.data as SuggestedCasesPartData) : null
+  const streamingCasesPart = useAuiState((state) =>
+    state.message.parts.find((part) => part.type === 'data' && part.name === STREAMING_CASES_PART),
+  )
+  const streamingCases =
+    streamingCasesPart?.type === 'data' ? (streamingCasesPart.data as SuggestedCaseRecord[]) : []
   const isDeclined = custom?.grounding?.status === 'insufficient'
 
   return (
@@ -147,6 +174,14 @@ export function AerisAssistantMessage({ projectId }: { projectId: string }) {
               sentProposalId={suggestedCases.sentProposalIds?.[index]}
               attachedCases={suggestedCases.attachedCases}
             />
+          ))}
+        </div>
+      )}
+
+      {streamingCases.length > 0 && (
+        <div className="flex w-full max-w-xl flex-col gap-2">
+          {streamingCases.map((suggestedCase, index) => (
+            <StreamingCaseCard key={index} suggestedCase={suggestedCase} />
           ))}
         </div>
       )}

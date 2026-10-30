@@ -9,6 +9,7 @@ import type { PendingMessage } from '@/features/projects/test-generation/hooks/u
 
 export const ATTACHED_CASES_PART = 'attached-cases'
 export const SUGGESTED_CASES_PART = 'suggested-cases'
+export const STREAMING_CASES_PART = 'streaming-cases'
 
 export const PENDING_MESSAGE_ID = 'aeris-pending-question'
 export const STREAMING_MESSAGE_ID = 'aeris-streaming-reply'
@@ -33,17 +34,19 @@ export interface AerisMessageCustomMetadata {
 export type AerisRuntimeMessage =
   | { kind: 'record'; record: ChatMessageRecord; precedingAttachedCases?: AttachedCaseRecord[] }
   | { kind: 'pending'; content: string; attachedCases: AttachedCaseRecord[] }
-  | { kind: 'streaming'; text: string }
+  | { kind: 'streaming'; text: string; cases: SuggestedCaseRecord[] }
 
 export function buildRuntimeMessages({
   messages,
   pendingMessage,
   streamingText,
+  streamingCases,
   isRunning,
 }: {
   messages: ChatMessageRecord[]
   pendingMessage: PendingMessage | null
   streamingText: string
+  streamingCases: SuggestedCaseRecord[]
   isRunning: boolean
 }): AerisRuntimeMessage[] {
   let precedingAttachedCases: AttachedCaseRecord[] | undefined
@@ -64,7 +67,7 @@ export function buildRuntimeMessages({
   }
 
   if (isRunning) {
-    runtimeMessages.push({ kind: 'streaming', text: streamingText })
+    runtimeMessages.push({ kind: 'streaming', text: streamingText, cases: streamingCases })
   }
 
   return runtimeMessages
@@ -93,7 +96,12 @@ export function convertAerisMessage(message: AerisRuntimeMessage): ThreadMessage
       id: STREAMING_MESSAGE_ID,
       role: 'assistant',
       status: { type: 'running' },
-      content: message.text === '' ? [] : [{ type: 'text', text: message.text }],
+      content: [
+        ...(message.text === '' ? [] : [{ type: 'text' as const, text: message.text }]),
+        ...(message.cases.length > 0
+          ? [{ type: `data-${STREAMING_CASES_PART}` as const, data: message.cases }]
+          : []),
+      ],
     }
   }
 

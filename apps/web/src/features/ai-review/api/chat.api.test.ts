@@ -189,6 +189,33 @@ describe('streamMessage', () => {
     expect(result).toEqual({ userMessage, assistantMessage })
   })
 
+  it('reports each case preview in order, ahead of the done event', async () => {
+    const suggestedCase = {
+      title: 'Rejects an expired card',
+      objective: 'Confirm expired cards are refused',
+      preconditions: [],
+      steps: ['Open checkout'],
+      expectedResult: 'The payment is refused',
+      priority: 'high' as const,
+    }
+    respondWithStream([
+      sse('delta', { text: 'Here is one:' }),
+      sse('case', { index: 0, case: suggestedCase }),
+      doneEvent,
+    ])
+    const cases: Array<{ index: number; case: unknown }> = []
+
+    const result = await streamMessage(
+      'proj-1',
+      'thread-1',
+      { content: 'What suites have the most cases?' },
+      { onCase: (index, suggestedCase) => cases.push({ index, case: suggestedCase }) },
+    )
+
+    expect(cases).toEqual([{ index: 0, case: suggestedCase }])
+    expect(result).toEqual({ userMessage, assistantMessage })
+  })
+
   it('decodes a multi-byte character split across two network chunks', async () => {
     const bytes = new TextEncoder().encode(sse('delta', { text: 'Configuración' }))
     const splitAt = bytes.indexOf(0xc3) + 1

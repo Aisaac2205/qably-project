@@ -1,4 +1,4 @@
-import type { ChatMessageRecord } from '@qably/types'
+import type { ChatMessageRecord, SuggestedCaseRecord } from '@qably/types'
 import { ApiError } from '@/lib/api-client'
 
 export interface ServerSentEvent {
@@ -8,6 +8,11 @@ export interface ServerSentEvent {
 
 export interface ChatStreamDelta {
   text: string
+}
+
+export interface ChatStreamCase {
+  index: number
+  case: SuggestedCaseRecord
 }
 
 export interface ChatStreamDone {
@@ -23,6 +28,8 @@ export interface ChatStreamFailure {
 export interface ChatStreamOptions {
   signal?: AbortSignal
   onDelta?: (text: string) => void
+  /** A suggested case as soon as it finishes streaming, before the reply is done. */
+  onCase?: (index: number, suggestedCase: SuggestedCaseRecord) => void
 }
 
 /**
@@ -130,7 +137,7 @@ function parsePayload<T>(data: string): T {
  */
 export async function readChatStream(
   body: ReadableStream<Uint8Array>,
-  { signal, onDelta }: ChatStreamOptions = {},
+  { signal, onDelta, onCase }: ChatStreamOptions = {},
 ): Promise<ChatStreamDone> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -142,6 +149,9 @@ export async function readChatStream(
     if (event === 'delta') {
       const { text } = parsePayload<ChatStreamDelta>(data)
       if (typeof text === 'string' && text !== '') onDelta?.(text)
+    } else if (event === 'case') {
+      const payload = parsePayload<ChatStreamCase>(data)
+      onCase?.(payload.index, payload.case)
     } else if (event === 'done') {
       outcome.done = parsePayload<ChatStreamDone>(data)
     } else if (event === 'error') {

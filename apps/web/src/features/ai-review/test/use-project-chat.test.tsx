@@ -11,6 +11,7 @@ import type {
   ChatMessageRecord,
   ChatThreadDetailRecord,
   ChatThreadRecord,
+  SuggestedCaseRecord,
 } from '@qably/types'
 
 const thread: ChatThreadRecord = {
@@ -96,6 +97,7 @@ function setup() {
 interface StreamOptions {
   signal?: AbortSignal
   onDelta?: (text: string) => void
+  onCase?: (index: number, suggestedCase: SuggestedCaseRecord) => void
 }
 
 function controllableStream() {
@@ -120,6 +122,8 @@ function controllableStream() {
 
   return {
     emit: (text: string) => control.options.onDelta?.(text),
+    emitCase: (index: number, suggestedCase: SuggestedCaseRecord) =>
+      control.options.onCase?.(index, suggestedCase),
     finish: (rows: ChatStreamDone) => control.finish(rows),
     fail: (error: unknown) => control.fail(error),
     signal: () => control.options.signal,
@@ -180,7 +184,11 @@ describe('useProjectChat', () => {
       'proj-1',
       'thread-1',
       { content: 'How many suites exist?', caseIds: [] },
-      expect.objectContaining({ signal: expect.any(AbortSignal), onDelta: expect.any(Function) }),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        onDelta: expect.any(Function),
+        onCase: expect.any(Function),
+      }),
     )
     expect(result.current.activeThreadId).toBe('thread-1')
     expect(result.current.pendingMessage).toBeNull()
@@ -220,6 +228,44 @@ describe('useProjectChat', () => {
     await act(async () => {
       stream.finish(doneRows)
     })
+  })
+
+  it('accumulates streamed case previews by index and clears them once the reply settles', async () => {
+    const firstCase: SuggestedCaseRecord = {
+      title: 'Rejects an expired card',
+      objective: 'Confirm expired cards are refused',
+      preconditions: [],
+      steps: ['Open checkout'],
+      expectedResult: 'The payment is refused',
+      priority: 'high',
+    }
+    const secondCase: SuggestedCaseRecord = { ...firstCase, title: 'Accepts a valid card' }
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetail)
+    const stream = controllableStream()
+    const { result } = setup()
+    await openThread(result)
+
+    act(() => {
+      void result.current.send('Another question')
+    })
+    await waitFor(() => expect(streamMessage).toHaveBeenCalled())
+    expect(result.current.streamingCases).toEqual([])
+
+    act(() => {
+      stream.emitCase(0, firstCase)
+    })
+    expect(result.current.streamingCases).toEqual([firstCase])
+
+    act(() => {
+      stream.emitCase(1, secondCase)
+    })
+    expect(result.current.streamingCases).toEqual([firstCase, secondCase])
+
+    await act(async () => {
+      stream.finish(doneRows)
+    })
+    expect(result.current.streamingCases).toEqual([])
   })
 
   it('writes the canonical done rows into the thread at once, replacing the streamed text', async () => {
