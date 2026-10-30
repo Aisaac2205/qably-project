@@ -465,6 +465,35 @@ describe('ChatController streamed send', () => {
     );
   });
 
+  it('frames a case preview event between the deltas and done', async () => {
+    const suggestedCase = {
+      title: 'Rejects an expired card',
+      objective: 'Confirm expired cards are refused',
+      preconditions: [],
+      steps: ['Open checkout'],
+      expectedResult: 'The payment is refused',
+      priority: 'high',
+    };
+    const caseEvent = {
+      type: 'case',
+      index: 0,
+      case: suggestedCase,
+    } as unknown as ChatStreamEvent;
+    const chat = fakeChat(undefined);
+    chat.streamMessage.mockImplementation(
+      streamOf({ type: 'delta', text: 'Here' }, caseEvent, doneEvent),
+    );
+    const response = new FakeResponse();
+
+    await sendStream(chat, response);
+
+    expect(response.body()).toBe(
+      sse('delta', { text: 'Here' }) +
+        sse('case', { index: 0, case: suggestedCase }) +
+        sse('done', { userMessage, assistantMessage }),
+    );
+  });
+
   it('starts the stream with done when the reply produced no preview text', async () => {
     const chat = fakeChat(undefined);
     chat.streamMessage.mockImplementation(streamOf(doneEvent));

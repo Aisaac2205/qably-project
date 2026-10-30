@@ -512,6 +512,8 @@ export class ChatService {
       for await (const event of events) {
         if (event.type === 'delta') {
           yield { type: 'delta', text: event.text };
+        } else if (event.type === 'case') {
+          yield { type: 'case', index: event.index, case: event.case };
         } else {
           outcome = event.outcome;
         }

@@ -3010,6 +3010,25 @@ describe('ChatService — streaming a message', () => {
     );
   });
 
+  it('passes through a case preview event from the assistant unchanged', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findMany.mockResolvedValue([]);
+    const assistant = streamingAssistant(
+      { type: 'delta', text: 'Here is a case worth adding.' },
+      { type: 'case', index: 0, case: suggestedCase },
+      { type: 'outcome', outcome: replied },
+    );
+    const service = build(prisma, assistant);
+
+    const events = await stream(service);
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Here is a case worth adding.' },
+      { type: 'case', index: 0, case: suggestedCase },
+      containing({ type: 'done' }),
+    ]);
+  });
+
   it('lists the attached cases on the streamed user message', async () => {
     const prisma = createPrisma();
     prisma.chatMessage.create

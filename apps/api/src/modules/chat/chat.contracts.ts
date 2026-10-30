@@ -86,12 +86,15 @@ export type ChatError =
   | 'file-unreadable';
 
 /**
- * What a streamed send produces, in order: reply text deltas, then either the
- * stored messages or the failure. A `failed` with no delta before it happened
- * before any reply text existed.
+ * What a streamed send produces: reply text deltas and case previews, in any
+ * order, then either the stored messages or the failure. A `failed` with no
+ * delta or case before it happened before any reply text existed. A
+ * previewed case is always one of `done.assistantMessage.suggestedCases`, at
+ * the same index.
  */
 export type ChatStreamEvent =
   | { type: 'delta'; text: string }
+  | { type: 'case'; index: number; case: SuggestedCase }
   | {
       type: 'done';
       userMessage: ChatMessageView;

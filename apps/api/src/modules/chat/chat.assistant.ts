@@ -53,11 +53,14 @@ export type ChatReplyOutcome =
   | { kind: 'provider-unavailable'; reason: string };
 
 /**
- * A streamed reply: zero or more deltas of reply text, then exactly one
- * outcome. The outcome is authoritative; the deltas only preview it.
+ * A streamed reply: zero or more deltas of reply text and case previews, in
+ * any order, then exactly one outcome. The outcome is authoritative; the
+ * deltas and cases only preview it, and a previewed case is always one of
+ * the outcome's own `cases`, at the same index.
  */
 export type ChatReplyStreamEvent =
   | { type: 'delta'; text: string }
+  | { type: 'case'; index: number; case: SuggestedCase }
   | { type: 'outcome'; outcome: ChatReplyOutcome };
 
 export interface ChatReplyStreamOptions {
@@ -229,8 +232,11 @@ export class GeminiChatAssistant implements ChatAssistant {
         if (piece === undefined || piece === '') continue;
 
         text = (text ?? '') + piece;
-        const delta = extractor.push(piece);
-        if (delta !== '') yield { type: 'delta', text: delta };
+        const { replyDelta, cases } = extractor.push(piece);
+        if (replyDelta !== '') yield { type: 'delta', text: replyDelta };
+        for (const entry of cases) {
+          yield { type: 'case', index: entry.index, case: entry.case };
+        }
       }
     } catch (error) {
       if (options.signal.aborted) {

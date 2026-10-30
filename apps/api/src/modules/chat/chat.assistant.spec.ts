@@ -329,6 +329,47 @@ describe('GeminiChatAssistant.replyStream', () => {
     ]);
   });
 
+  it('streams a case preview as soon as its element closes, before the reply closes or the outcome arrives', async () => {
+    const suggestedCase = {
+      title: 'Rejects an expired card',
+      objective: 'Confirm expired cards are refused',
+      preconditions: [],
+      steps: ['Open checkout'],
+      expectedResult: 'The payment is refused',
+      priority: 'high',
+    };
+    const client = streamingClient(() =>
+      Promise.resolve(
+        chunks(
+          { text: '{"reply":"Here","cases":[' },
+          { text: JSON.stringify(suggestedCase) },
+          { text: '],"grounding":{"status":"insufficient"}}' },
+        ),
+      ),
+    );
+
+    const events = await collect(
+      new GeminiChatAssistant(client, env()).replyStream(input(), {
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Here' },
+      { type: 'case', index: 0, case: suggestedCase },
+      {
+        type: 'outcome',
+        outcome: {
+          kind: 'replied',
+          reply: 'Here',
+          cases: [suggestedCase],
+          grounding: { status: 'insufficient' },
+          usage: { promptTokens: 0, candidatesTokens: 0, totalTokens: 0 },
+        },
+      },
+    ]);
+  });
+
   it('sends the same request as a plain reply, plus the abort signal', async () => {
     const plain = capture();
     await new GeminiChatAssistant(plain.client, env()).reply(input());

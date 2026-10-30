@@ -150,6 +150,9 @@ function writeStreamEvent(response: Response, event: ChatStreamEvent): void {
     case 'delta':
       writeEvent(response, 'delta', { text: event.text });
       return;
+    case 'case':
+      writeEvent(response, 'case', { index: event.index, case: event.case });
+      return;
     case 'done':
       writeEvent(response, 'done', {
         userMessage: event.userMessage,
