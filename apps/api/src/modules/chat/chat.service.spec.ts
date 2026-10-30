@@ -90,6 +90,7 @@ interface FakePrisma {
     findMany: jest.Mock;
   };
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 }
 
 function createPrisma(): FakePrisma {
@@ -175,6 +176,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
     },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn().mockResolvedValue([{ name: 'Accepts a valid card' }]),
   };
   prisma.$transaction.mockImplementation(
     (fn: (tx: FakePrisma) => Promise<unknown>) => fn(prisma),
@@ -326,6 +328,44 @@ describe('ChatService', () => {
           role: 'assistant',
           promptVersion: CHAT_PROMPT_VERSION,
           totalTokens: 120,
+        }),
+      }),
+    );
+  });
+
+  it('ranks case titles by similarity to the user message, not recency, when building context', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockResolvedValue([
+      { name: 'Rejects an expired card' },
+      { name: 'Accepts a valid card' },
+    ]);
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [],
+      usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+      grounding: { status: 'grounded', references: [] },
+    });
+    const service = build(prisma, assistant);
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'How do expired cards behave at checkout?',
+    });
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [query] = prisma.$queryRaw.mock.calls[0] as [
+      { sql: string; values: unknown[] },
+    ];
+    expect(query.sql).toContain('similarity(name,');
+    expect(query.values).toEqual([
+      'project-1',
+      'How do expired cards behave at checkout?',
+      60,
+    ]);
+    expect(assistant.reply).toHaveBeenCalledWith(
+      containing({
+        context: containing({
+          caseTitles: ['Rejects an expired card', 'Accepts a valid card'],
         }),
       }),
     );

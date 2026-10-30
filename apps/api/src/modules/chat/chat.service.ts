@@ -6,7 +6,7 @@ import {
   type RepoConnectionProvider,
 } from '@qably/types';
 import { err, isErr, ok, type Result } from '../../common/result';
-import type { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../../generated/prisma/client';
 import { DOMAIN_EVENTS } from '../../common/events/domain-events';
 import { DomainEvents } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -610,7 +610,7 @@ export class ChatService {
     if (!withinBudget) return err('quota-exhausted');
 
     const [context, locale] = await Promise.all([
-      this.buildContext(projectId),
+      this.buildContext(projectId, input.content),
       this.resolveLocale(user.id),
     ]);
     const caseContext =
@@ -1324,7 +1324,30 @@ export class ChatService {
     });
   }
 
-  private async buildContext(projectId: string): Promise<ChatProjectContext> {
+  /**
+   * Case titles ranked by trigram similarity to the user's message, not by
+   * recency: beyond CONTEXT_CASE_LIMIT active cases, "most recently updated"
+   * crowds out the titles actually relevant to what was asked. Ties (no
+   * shared trigrams, e.g. a generic greeting) fall back to updatedAt desc,
+   * matching the previous behavior.
+   */
+  private async rankCaseTitles(
+    projectId: string,
+    message: string,
+  ): Promise<{ name: string }[]> {
+    return this.prisma.$queryRaw<{ name: string }[]>(Prisma.sql`
+      SELECT name
+        FROM "test_case"
+       WHERE "projectId" = ${projectId} AND state = 'active'
+       ORDER BY similarity(name, ${message}) DESC, "updatedAt" DESC
+       LIMIT ${CONTEXT_CASE_LIMIT}
+    `);
+  }
+
+  private async buildContext(
+    projectId: string,
+    message: string,
+  ): Promise<ChatProjectContext> {
     const [project, suites, fileRows, cases, runs] = await Promise.all([
       this.prisma.project.findFirst({
         where: { id: projectId },
@@ -1332,12 +1355,7 @@ export class ChatService {
       }),
       this.readSuiteSummaries(projectId),
       this.readSuiteFileRows(projectId),
-      this.prisma.testCase.findMany({
-        where: { projectId, state: 'active' },
-        select: { name: true },
-        orderBy: { updatedAt: 'desc' },
-        take: CONTEXT_CASE_LIMIT,
-      }),
+      this.rankCaseTitles(projectId, message),
       this.prisma.run.findMany({
         where: { projectId },
         select: { name: true, status: true, startedAt: true },
